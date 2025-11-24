@@ -1,0 +1,79 @@
+using System;
+using System.IO;
+using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.EditorInput;
+using BlockManager.Abstractions;
+using BlockManager.Core;
+
+namespace BlockManager.Adapter._2010
+{
+    /// <summary>
+    /// AutoCAD 2010 块库服务实现
+    /// </summary>
+    public class Cad2010BlockLibraryService : IBlockLibraryService
+    {
+        public void ShowBlockLibraryViewer()
+        {
+            try
+            {
+                var viewer = new BlockLibraryViewer(this);
+                viewer.Show();
+            }
+            catch (Exception ex)
+            {
+                ShowMessage($"启动块库浏览器时发生错误: {ex.Message}");
+            }
+        }
+
+        public void InsertDwgBlock(string dwgPath, string blockName)
+        {
+            try
+            {
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                var ed = doc.Editor;
+
+                ed.WriteMessage($"\n从块库浏览器请求插入 DWG 块: {blockName}");
+
+                // 确保路径格式正确
+                string normalizedPath = Path.GetFullPath(dwgPath);
+                
+                // 检查文件是否存在
+                if (!File.Exists(normalizedPath))
+                {
+                    ed.WriteMessage($"\n错误：文件不存在 - {normalizedPath}");
+                    return;
+                }
+                
+                // 使用 LISP 命令格式来执行 INSERT 命令
+                string escapedPath = normalizedPath.Replace("\\", "\\\\");
+                string commandStr = $"(command \"_INSERT\" \"{escapedPath}\" pause \"\" \"\" \"\") \n";
+                
+                doc.SendStringToExecute(commandStr, false, false, false);
+                
+                ed.WriteMessage($"\n已启动 INSERT 命令: {blockName}");
+            }
+            catch (Exception ex)
+            {
+                ShowMessage($"执行 DWG 插入命令时发生错误: {ex.Message}");
+            }
+        }
+
+        public bool FileExists(string filePath)
+        {
+            return File.Exists(filePath);
+        }
+
+        public void ShowMessage(string message)
+        {
+            try
+            {
+                var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
+                ed?.WriteMessage($"\n{message}");
+            }
+            catch
+            {
+                // 如果无法访问编辑器，忽略错误
+            }
+        }
+    }
+}

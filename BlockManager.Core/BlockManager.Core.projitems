@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>4a90d708-b37a-48f4-a661-1114ecf4e7d6</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>BlockManager.Core</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryCommands.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryViewer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)Block\%2820251111更新%29大样图.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\200x1800预埋件大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\300x300夹层柱断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\300x300梯柱断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\300x500梁断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\400x400梯柱断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\500x1280扶梯支墩大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\500x500预埋件大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\500x600扶梯支墩大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\600x1200梁断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\700x1100框柱断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\800x1200框柱断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\800x1400扶壁柱.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%2810t＜Q≤20t%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%282t＜Q≤5t%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%285t＜Q≤10t%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%28Q≤2t%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\孔边加强%28加强%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\孔边加强%28绕避%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\悬挑板放射加强筋.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\挡水坎大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\盾构孔环梁断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\箍筋、拉筋弯钩大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\腋角大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\主体结构\集水坑大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\1000x1000冠梁配筋断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\700x900支撑配筋断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\800x1000支撑配筋断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\800x900支撑配筋断面.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\800宽地连墙导墙%28L型%29.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\冠梁水平转折钢筋构造大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\砼腰梁与围护桩连接.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\砼腰梁与地连墙连接.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\围护结构\砼角撑配筋大样.dwg" />
+    <None Include="$(MSBuildThisFileDirectory)Block\常用符号\常用符号.dwg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\200x1800预埋件大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\300x300夹层柱断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\300x300梯柱断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\300x500梁断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\400x400梯柱断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\500x1280扶梯支墩大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\500x500预埋件大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\500x600扶梯支墩大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\600x1200梁断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\700x1100框柱断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\800x1200框柱断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\800x1400扶壁柱.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%2810t＜Q≤20t%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%282t＜Q≤5t%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%285t＜Q≤10t%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\吊钩大样%28Q≤2t%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\孔边加强%28加强%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\孔边加强%28绕避%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\悬挑板放射加强筋.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\挡水坎大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\盾构孔环梁断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\箍筋、拉筋弯钩大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\腋角大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\主体结构\集水坑大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\1000x1000冠梁配筋断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\700x900支撑配筋断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\800x1000冠梁配筋断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\800x900支撑配筋断面.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\800宽地连墙导墙%28L型%29.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\冠梁水平转折钢筋构造大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\砼腰梁与围护桩连接.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\砼腰梁与地连墙连接.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\围护结构\砼角撑配筋大样.png" />
+    <Content Include="$(MSBuildThisFileDirectory)Block\常用符号\常用符号.png" />
+  </ItemGroup>
+</Project>
