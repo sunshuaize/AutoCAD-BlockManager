@@ -9,7 +9,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryCommands.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryViewer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)BlockLibraryViewer.Designer.cs">
+      <DependentUpon>BlockLibraryViewer.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)Block\%2820251111更新%29大样图.dwg" />

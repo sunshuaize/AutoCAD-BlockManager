@@ -9,9 +9,6 @@ namespace BlockManager.Core
 {
     public partial class BlockLibraryViewer : Form
     {
-        private TreeView treeView;
-        private PictureBox pictureBox;
-        private Label statusLabel;
         private string blockRootPath;
         private IBlockLibraryService _blockLibraryService;
 
@@ -44,64 +41,6 @@ namespace BlockManager.Core
             }
             
             LoadBlockLibrary();
-        }
-
-        private void InitializeComponent()
-        {
-            this.SuspendLayout();
-
-            // 窗体设置
-            this.Text = "块库浏览器 - Block Library Viewer";
-            this.Size = new Size(1000, 700);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(800, 600);
-
-            // 创建分割面板
-            var splitContainer = new SplitContainer();
-            splitContainer.Dock = DockStyle.Fill;
-            splitContainer.SplitterDistance = 350;
-            splitContainer.FixedPanel = FixedPanel.Panel1;
-
-            // 左侧 TreeView
-            treeView = new TreeView();
-            treeView.Dock = DockStyle.Fill;
-            treeView.ShowLines = true;
-            treeView.ShowPlusMinus = true;
-            treeView.ShowRootLines = true;
-            treeView.FullRowSelect = true;
-            treeView.HideSelection = false;
-            treeView.ImageList = CreateImageList();
-            treeView.AfterSelect += TreeView_AfterSelect;
-            treeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
-
-            // 右侧预览面板
-            var rightPanel = new Panel();
-            rightPanel.Dock = DockStyle.Fill;
-            rightPanel.BackColor = Color.White;
-
-            // 图片预览
-            pictureBox = new PictureBox();
-            pictureBox.Dock = DockStyle.Fill;
-            pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
-            pictureBox.BackColor = Color.White;
-
-            // 状态标签
-            statusLabel = new Label();
-            statusLabel.Dock = DockStyle.Bottom;
-            statusLabel.Height = 30;
-            statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-            statusLabel.BackColor = Color.LightGray;
-            statusLabel.Text = "请选择一个块文件查看预览";
-
-            // 组装界面
-            rightPanel.Controls.Add(pictureBox);
-            rightPanel.Controls.Add(statusLabel);
-
-            splitContainer.Panel1.Controls.Add(treeView);
-            splitContainer.Panel2.Controls.Add(rightPanel);
-
-            this.Controls.Add(splitContainer);
-            this.ResumeLayout(false);
         }
 
         private ImageList CreateImageList()
@@ -425,15 +364,5 @@ namespace BlockManager.Core
 
         // DWG 块插入请求事件（向后兼容）
         public static event Action<string, string> OnDwgBlockInsertRequested;
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                pictureBox?.Image?.Dispose();
-                treeView?.ImageList?.Dispose();
-            }
-            base.Dispose(disposing);
-        }
     }
 }

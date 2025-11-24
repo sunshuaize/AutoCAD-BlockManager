@@ -41,6 +41,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
@@ -54,6 +55,10 @@
     <Compile Include="..\BlockManager.Core\BlockLibraryViewer.cs">
       <Link>Core\BlockLibraryViewer.cs</Link>
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="..\BlockManager.Core\BlockLibraryViewer.Designer.cs">
+      <Link>Core\BlockLibraryViewer.Designer.cs</Link>
+      <DependentUpon>BlockLibraryViewer.cs</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
