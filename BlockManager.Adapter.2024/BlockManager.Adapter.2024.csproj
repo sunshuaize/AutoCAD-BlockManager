@@ -48,26 +48,14 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Drawing" />
     <Reference Include="System.Linq" />
-    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BlockInsertCommands.cs" />
     <Compile Include="Cad2024BlockLibraryService.cs" />
     <Compile Include="Cad2024CADCommandService.cs" />
-    <Compile Include="..\BlockManager.Core\BlockLibraryCommands.cs">
-      <Link>Core\BlockLibraryCommands.cs</Link>
-    </Compile>
-    <Compile Include="..\BlockManager.Core\BlockLibraryViewer.cs">
-      <Link>Core\BlockLibraryViewer.cs</Link>
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="..\BlockManager.Core\BlockLibraryViewer.Designer.cs">
-      <Link>Core\BlockLibraryViewer.Designer.cs</Link>
-      <DependentUpon>BlockLibraryViewer.cs</DependentUpon>
-    </Compile>
+    <Compile Include="Cad2024IPCServerImplementation.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -75,6 +63,17 @@
       <Project>{f1553ee7-2bac-4c45-9f58-ad17edcf5587}</Project>
       <Name>BlockManager.Abstractions</Name>
     </ProjectReference>
+    <ProjectReference Include="..\BlockManager.IPC\BlockManager.IPC.csproj">
+      <Name>BlockManager.IPC</Name>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="CopyNewtonsoftJson" AfterTargets="Build">
+    <ItemGroup>
+      <NewtonsoftJsonFiles Include="$(SolutionDir)packages\Newtonsoft.Json.*\lib\net45\Newtonsoft.Json.dll" />
+      <NewtonsoftJsonFiles Include="$(UserProfile)\.nuget\packages\newtonsoft.json\*\lib\netstandard2.0\Newtonsoft.Json.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NewtonsoftJsonFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
+  </Target>
 </Project>

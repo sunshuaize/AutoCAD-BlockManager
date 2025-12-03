@@ -3,7 +3,6 @@ using System.IO;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
 using BlockManager.Abstractions;
-using BlockManager.Core;
 
 namespace BlockManager.Adapter._2010
 {
@@ -14,15 +13,8 @@ namespace BlockManager.Adapter._2010
     {
         public void ShowBlockLibraryViewer()
         {
-            try
-            {
-                var viewer = new BlockLibraryViewer(this);
-                viewer.Show();
-            }
-            catch (Exception ex)
-            {
-                ShowMessage($"启动块库浏览器时发生错误: {ex.Message}");
-            }
+            // 此方法已不再使用，现在通过IPC和现代化UI实现
+            ShowMessage("请使用 BLOCKVIEWER 命令启动现代化块库浏览器");
         }
 
         public void InsertDwgBlock(string dwgPath, string blockName)
