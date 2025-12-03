@@ -25,7 +25,7 @@ namespace BlockManager.Adapter._2024
             
             // 初始化IPC服务
             _ipcImplementation = new Cad2024IPCServerImplementation(_blockLibraryService);
-            _ipcServer = new NamedPipeServer(_ipcImplementation, "BlockManager_IPC_2024");
+            _ipcServer = new NamedPipeServer(_ipcImplementation, "BlockManager_IPC");
         }
 
         [CommandMethod("BLOCKVIEWER")]
@@ -50,7 +50,7 @@ namespace BlockManager.Adapter._2024
                     var processInfo = new ProcessStartInfo
                     {
                         FileName = uiProcessPath,
-                        Arguments = "--pipe BlockManager_IPC_2024",
+                        Arguments = "--pipe BlockManager_IPC",
                         UseShellExecute = false,
                         WorkingDirectory = Path.GetDirectoryName(uiProcessPath),
                         CreateNoWindow = false,

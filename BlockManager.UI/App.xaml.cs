@@ -76,8 +76,8 @@ namespace BlockManager.UI
                 }
             }
             
-            // 默认尝试2024版本的管道，如果不存在则使用2010版本
-            return "BlockManager_IPC_2024";
+            // 默认使用统一的管道名称
+            return "BlockManager_IPC";
         }
     }
 }

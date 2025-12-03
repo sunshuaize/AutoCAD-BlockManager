@@ -389,7 +389,8 @@ namespace BlockManager.Adapter._2010
                 try
                 {
                     var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Editor;
-                                    }
+                    ed?.WriteMessage("\n" + logMessage);
+                }
                 catch
                 {
                     // AutoCAD编辑器可能不可用

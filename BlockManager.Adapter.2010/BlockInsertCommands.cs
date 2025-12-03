@@ -21,7 +21,7 @@ namespace BlockManager.Adapter._2010
             _cadCommandService = new Cad2010CADCommandService();
 
             // 初始化简化的IPC服务器
-            _ipcServer = new SimpleIPCServer(_blockLibraryService);
+            _ipcServer = new SimpleIPCServer(_blockLibraryService, "BlockManager_IPC");
         }
 
         [CommandMethod("BLOCKVIEWER")]
@@ -47,9 +47,12 @@ namespace BlockManager.Adapter._2010
                     var processInfo = new ProcessStartInfo
                     {
                         FileName = uiProcessPath,
-                        Arguments = "--pipe BlockManager_IPC", // 指定2010版本的管道
-                        UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(uiProcessPath)
+                        Arguments = "--pipe BlockManager_IPC", // 指定统一的管道名称
+                        UseShellExecute = false,
+                        WorkingDirectory = Path.GetDirectoryName(uiProcessPath),
+                        CreateNoWindow = false,
+                        RedirectStandardOutput = false,
+                        RedirectStandardError = false
                     };
 
                     var process = Process.Start(processInfo);
@@ -82,8 +85,11 @@ namespace BlockManager.Adapter._2010
                 var possiblePaths = new[]
                 {
                     Path.Combine(currentDirectory, "BlockManager.UI.exe"),
+                    CombinePaths(currentDirectory, "..", "BlockManager.UI", "bin", "Debug", "net6.0-windows7.0", "BlockManager.UI.exe"),
+                    CombinePaths(currentDirectory, "..", "BlockManager.UI", "bin", "Release", "net6.0-windows7.0", "BlockManager.UI.exe"),
                     CombinePaths(currentDirectory, "..", "BlockManager.UI", "bin", "Debug", "net8.0-windows", "BlockManager.UI.exe"),
                     CombinePaths(currentDirectory, "..", "BlockManager.UI", "bin", "Release", "net8.0-windows", "BlockManager.UI.exe"),
+                    CombinePaths(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "BlockManager", "BlockManager.UI", "bin", "Debug", "net6.0-windows7.0", "BlockManager.UI.exe"),
                     CombinePaths(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "BlockManager", "BlockManager.UI", "bin", "Debug", "net8.0-windows", "BlockManager.UI.exe")
                 };
 

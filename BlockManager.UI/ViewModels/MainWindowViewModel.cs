@@ -271,7 +271,7 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         private async Task ConnectToAvailableServerAsync()
         {
-            var pipeNames = new[] { "BlockManager_IPC_2024", "BlockManager_IPC" };
+            var pipeNames = new[] {  "BlockManager_IPC" };
             
             foreach (var pipeName in pipeNames)
             {

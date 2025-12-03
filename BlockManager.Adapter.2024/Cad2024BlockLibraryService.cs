@@ -31,7 +31,8 @@ namespace BlockManager.Adapter._2024
                 // 检查文件是否存在
                 if (!File.Exists(normalizedPath))
                 {
-                                        return;
+                    ShowMessage($"错误：文件不存在 - {normalizedPath}");
+                    return;
                 }
                 
                 // 使用 LISP 命令格式来执行 INSERT 命令
@@ -57,7 +58,8 @@ namespace BlockManager.Adapter._2024
             try
             {
                 var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                            }
+                ed?.WriteMessage($"\n{message}");
+            }
             catch
             {
                 // 如果无法访问编辑器，忽略错误
