@@ -15,12 +15,15 @@ namespace BlockManager.UI.ViewModels
         private TreeNodeDto? _rootNode;
         private TreeNodeDto? _selectedNode;
         private PreviewDto? _currentPreview;
-        private string _statusText = "就绪";
+        private string _statusText = "正在初始化...";
         private bool _isLoading;
+        private string _connectionStatus = "未连接";
+        private string _connectionStatusColor = "Red";
 
         public MainWindowViewModel(IBlockManagerClient client)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
+            
             
             // 初始化命令
             LoadLibraryCommand = new AsyncRelayCommand(LoadLibraryAsync);
@@ -29,6 +32,23 @@ namespace BlockManager.UI.ViewModels
             
             // 订阅文件变化事件
             _client.FileChanged += OnFileChanged;
+            
+            // 使用后台任务启动自动加载，避免阻塞UI
+            Task.Run(async () =>
+            {
+                try
+                {
+                    // 等待UI完全初始化
+                    await Task.Delay(3000);
+                    
+                    // 触发自动加载
+                    await TriggerAutoLoadAsync();
+                }
+                catch
+                {
+                    // 自动加载失败，用户可以手动点击加载按钮
+                }
+            });
         }
 
         #region 属性
@@ -84,6 +104,24 @@ namespace BlockManager.UI.ViewModels
             set => SetProperty(ref _isLoading, value);
         }
 
+        /// <summary>
+        /// 连接状态文本
+        /// </summary>
+        public string ConnectionStatus
+        {
+            get => _connectionStatus;
+            set => SetProperty(ref _connectionStatus, value);
+        }
+
+        /// <summary>
+        /// 连接状态颜色
+        /// </summary>
+        public string ConnectionStatusColor
+        {
+            get => _connectionStatusColor;
+            set => SetProperty(ref _connectionStatusColor, value);
+        }
+
         #endregion
 
         #region 命令
@@ -105,7 +143,86 @@ namespace BlockManager.UI.ViewModels
 
         #endregion
 
+        #region 公共方法
+
+        /// <summary>
+        /// 触发自动加载（由MainWindow在加载完成后调用）
+        /// </summary>
+        public async Task TriggerAutoLoadAsync()
+        {
+            await InitializeAsync();
+        }
+
+        #endregion
+
         #region 私有方法
+
+        /// <summary>
+        /// 初始化ViewModel，自动加载块文件夹
+        /// </summary>
+        private async Task InitializeAsync()
+        {
+            try
+            {
+                StatusText = "正在连接...";
+                
+                // 延迟确保AutoCAD的IPC服务器完全启动
+                await Task.Delay(100);
+                
+                StatusText = "正在加载块文件夹...";
+                
+                // 使用重试机制自动加载块库
+                await LoadLibraryWithRetryAsync();
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"自动加载失败: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 带重试机制的加载块库
+        /// </summary>
+        private async Task LoadLibraryWithRetryAsync()
+        {
+            const int maxRetries = 5;
+            const int retryDelayMs = 1000;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    StatusText = $"正在连接... (第{attempt}次)";
+                    
+                    await LoadLibraryAsync();
+                    
+                    return; // 成功则退出
+                }
+                catch (Exception ex)
+                {
+                    if (attempt == maxRetries)
+                    {
+                        // 最后一次尝试失败
+                        StatusText = $"连接失败: {ex.Message}";
+                        ConnectionStatus = "连接失败";
+                        ConnectionStatusColor = "Red";
+                        
+                        if (ex.Message.Contains("无法连接到CAD进程") || ex.Message.Contains("All pipe instances are busy"))
+                        {
+                            StatusText += "\n\n💡 提示：要测试完整功能，请：\n1. 启动AutoCAD\n2. 加载BlockManager插件\n3. 执行BLOCKVIEWER命令";
+                        }
+                        
+                        throw;
+                    }
+                    else
+                    {
+                        // 等待后重试
+                        StatusText = $"连接失败，{retryDelayMs/1000}秒后重试...";
+                        await Task.Delay(retryDelayMs);
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// 加载块库
@@ -123,24 +240,25 @@ namespace BlockManager.UI.ViewModels
                     await ConnectToAvailableServerAsync();
                 }
 
+                // 更新连接状态
+                ConnectionStatus = "已连接";
+                ConnectionStatusColor = "Green";
+                
                 StatusText = "正在加载块库...";
                 var rootPath = @"c:\Users\PC\Desktop\BlockManager\Block";
-                StatusText = $"[调试] 请求加载路径: {rootPath}";
                 
                 RootNode = await _client.GetBlockLibraryTreeAsync(rootPath);
-                StatusText = $"已加载块库: {rootPath} (节点数: {RootNode?.Children?.Count ?? 0})";
+                StatusText = $"已加载块库 (节点数: {RootNode?.Children?.Count ?? 0})";
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                StatusText = $"连接失败: {ex.Message}";
-                
-                // 提供测试模式的提示
-                if (ex.Message.Contains("无法连接到CAD进程") || ex.Message.Contains("All pipe instances are busy"))
-                {
-                    StatusText += "\n\n💡 提示：要测试完整功能，请：\n1. 启动AutoCAD\n2. 加载BlockManager插件\n3. 执行BLOCKVIEWER命令\n\n🔍 调试信息：\n- 检查AutoCAD是否运行\n- 检查插件是否加载\n- 检查IPC服务器是否启动";
-                }
-                
+                // 重置连接状态
+                ConnectionStatus = "未连接";
+                ConnectionStatusColor = "Red";
                 RootNode = null;
+                
+                // 重新抛出异常，让重试机制处理
+                throw;
             }
             finally
             {

@@ -24,16 +24,14 @@ namespace BlockManager.Adapter._2024
                 var doc = Application.DocumentManager.MdiActiveDocument;
                 var ed = doc.Editor;
 
-                ed.WriteMessage($"\n从块库浏览器请求插入 DWG 块: {blockName}");
-
+                
                 // 确保路径格式正确
                 string normalizedPath = Path.GetFullPath(dwgPath);
                 
                 // 检查文件是否存在
                 if (!File.Exists(normalizedPath))
                 {
-                    ed.WriteMessage($"\n错误：文件不存在 - {normalizedPath}");
-                    return;
+                                        return;
                 }
                 
                 // 使用 LISP 命令格式来执行 INSERT 命令
@@ -42,8 +40,7 @@ namespace BlockManager.Adapter._2024
                 
                 doc.SendStringToExecute(commandStr, false, false, false);
                 
-                ed.WriteMessage($"\n已启动 INSERT 命令: {blockName}");
-            }
+                            }
             catch (Exception ex)
             {
                 ShowMessage($"执行 DWG 插入命令时发生错误: {ex.Message}");
@@ -60,8 +57,7 @@ namespace BlockManager.Adapter._2024
             try
             {
                 var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                ed?.WriteMessage($"\n{message}");
-            }
+                            }
             catch
             {
                 // 如果无法访问编辑器，忽略错误

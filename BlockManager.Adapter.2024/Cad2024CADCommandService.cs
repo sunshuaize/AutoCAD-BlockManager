@@ -28,8 +28,7 @@ namespace BlockManager.Adapter._2024
             try
             {
                 var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                ed?.WriteMessage($"\n{message}");
-            }
+                            }
             catch
             {
                 // 如果无法访问编辑器，忽略错误

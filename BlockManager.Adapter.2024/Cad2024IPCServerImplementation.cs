@@ -102,8 +102,7 @@ namespace BlockManager.Adapter._2024
             try
             {
                 var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Editor;
-                ed?.WriteMessage("\n" + message);
-                
+                                
                 // 同时输出到调试窗口和控制台
                 System.Diagnostics.Debug.WriteLine(message);
                 Console.WriteLine(message);

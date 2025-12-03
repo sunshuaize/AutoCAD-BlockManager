@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -64,6 +65,7 @@ namespace BlockManager.UI
         private string DetectPipeName()
         {
             var args = Environment.GetCommandLineArgs();
+            
             
             // 检查命令行参数
             for (int i = 0; i < args.Length - 1; i++)

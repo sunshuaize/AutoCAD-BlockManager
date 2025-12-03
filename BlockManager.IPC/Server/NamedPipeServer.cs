@@ -43,7 +43,10 @@ namespace BlockManager.IPC.Server
 
             IsRunning = true;
             _serverTask = Task.Run(async () => await RunServerAsync(_cancellationTokenSource.Token));
-            await Task.CompletedTask;
+            
+            // 等待服务器真正开始监听
+            await Task.Delay(100); // 给服务器一点时间来创建命名管道
+            LogToAutoCAD($"IPC服务器已启动并开始监听管道: {_pipeName}");
         }
 
         public async Task StopAsync()

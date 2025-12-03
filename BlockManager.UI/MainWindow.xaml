@@ -132,7 +132,9 @@
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="连接状态: "/>
-                    <TextBlock Text="已连接" Foreground="Green" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding ConnectionStatus}" 
+                               Foreground="{Binding ConnectionStatusColor}" 
+                               FontWeight="Bold"/>
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>

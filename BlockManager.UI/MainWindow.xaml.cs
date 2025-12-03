@@ -22,6 +22,44 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        
+        // 移除Loaded事件，使用构造函数中的后台任务触发自动加载
+        // Loaded += MainWindow_Loaded;
+    }
+    
+    /// <summary>
+    /// 窗口加载完成事件
+    /// </summary>
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("[UI] MainWindow_Loaded事件被触发");
+        
+        // 写入日志文件确认调用
+        try
+        {
+            var logPath = @"c:\temp\ui_autoload_debug.log";
+            var logDir = System.IO.Path.GetDirectoryName(logPath);
+            if (!System.IO.Directory.Exists(logDir))
+            {
+                System.IO.Directory.CreateDirectory(logDir);
+            }
+            System.IO.File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} MainWindow_Loaded事件被触发\n");
+        }
+        catch { }
+        
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            System.Diagnostics.Debug.WriteLine("[UI] 找到ViewModel，准备调用TriggerAutoLoadAsync");
+            System.IO.File.AppendAllText(@"c:\temp\ui_autoload_debug.log", $"{DateTime.Now:HH:mm:ss.fff} 找到ViewModel，准备调用TriggerAutoLoadAsync\n");
+            
+            // 触发自动加载
+            await viewModel.TriggerAutoLoadAsync();
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("[UI] 错误：DataContext不是MainWindowViewModel");
+            System.IO.File.AppendAllText(@"c:\temp\ui_autoload_debug.log", $"{DateTime.Now:HH:mm:ss.fff} 错误：DataContext不是MainWindowViewModel\n");
+        }
     }
 
     /// <summary>
