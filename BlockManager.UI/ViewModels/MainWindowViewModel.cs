@@ -21,6 +21,7 @@ namespace BlockManager.UI.ViewModels
     {
         private readonly IBlockManagerClient _client;
         private readonly ISettingsService _settingsService;
+        private readonly IHistoryService _historyService;
         private TreeNodeDto? _rootNode;
         private TreeNodeDto? _selectedNode;
         private PreviewDto? _currentPreview;
@@ -35,11 +36,14 @@ namespace BlockManager.UI.ViewModels
         private ObservableCollection<TreeNodeDto> _searchResults = new();
         private bool _isSearchMode = false;
         private TreeNodeDto? _selectedFile;
+        private ObservableCollection<HistoryItem> _historyItems = new();
+        private bool _isHistoryMode = false;
 
-        public MainWindowViewModel(IBlockManagerClient client, ISettingsService settingsService)
+        public MainWindowViewModel(IBlockManagerClient client, ISettingsService settingsService, IHistoryService historyService)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+            _historyService = historyService ?? throw new ArgumentNullException(nameof(historyService));
             
             
             // 初始化命令
@@ -50,6 +54,10 @@ namespace BlockManager.UI.ViewModels
             InsertToCadCommand = new AsyncRelayCommand<TreeNodeDto>(InsertToCadAsync);
             SearchCommand = new RelayCommand<string>(ExecuteSearch);
             ClearSearchCommand = new RelayCommand(ClearSearch);
+            ShowHistoryCommand = new AsyncRelayCommand(ShowHistoryAsync);
+            HideHistoryCommand = new RelayCommand(HideHistory);
+            HistoryItemClickCommand = new AsyncRelayCommand<HistoryItem>(OnHistoryItemClickAsync);
+            ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
             
             // 订阅文件变化事件
             _client.FileChanged += OnFileChanged;
@@ -255,6 +263,24 @@ namespace BlockManager.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// 历史记录列表
+        /// </summary>
+        public ObservableCollection<HistoryItem> HistoryItems
+        {
+            get => _historyItems;
+            set => SetProperty(ref _historyItems, value);
+        }
+
+        /// <summary>
+        /// 是否显示历史记录
+        /// </summary>
+        public bool IsHistoryMode
+        {
+            get => _isHistoryMode;
+            set => SetProperty(ref _isHistoryMode, value);
+        }
+
         #endregion
 
         #region 命令
@@ -293,6 +319,26 @@ namespace BlockManager.UI.ViewModels
         /// 清空搜索命令
         /// </summary>
         public ICommand ClearSearchCommand { get; }
+
+        /// <summary>
+        /// 显示历史记录命令
+        /// </summary>
+        public ICommand ShowHistoryCommand { get; }
+
+        /// <summary>
+        /// 隐藏历史记录命令
+        /// </summary>
+        public ICommand HideHistoryCommand { get; }
+
+        /// <summary>
+        /// 历史记录项点击命令
+        /// </summary>
+        public AsyncRelayCommand<HistoryItem> HistoryItemClickCommand { get; }
+
+        /// <summary>
+        /// 清空历史记录命令
+        /// </summary>
+        public AsyncRelayCommand ClearHistoryCommand { get; }
 
         #endregion
 
@@ -888,34 +934,104 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         private async Task InsertToCadAsync(TreeNodeDto? dwgFile)
         {
+            System.Diagnostics.Debug.WriteLine($"[INSERT] InsertToCadAsync 被调用");
+            
             if (dwgFile == null) 
             {
+                System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ dwgFile 为 null");
                 StatusText = "错误: 未选择文件";
                 return;
             }
+
+            System.Diagnostics.Debug.WriteLine($"[INSERT] 准备插入文件: {dwgFile.Name}, 路径: {dwgFile.Path}");
 
             try
             {
                 StatusText = $"正在插入到CAD: {dwgFile.Name}";
                 
                 // 检查文件是否存在
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 检查文件是否存在: {dwgFile.Path}");
                 if (!File.Exists(dwgFile.Path))
                 {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 文件不存在: {dwgFile.Path}");
                     StatusText = $"错误: 文件不存在 - {dwgFile.Path}";
                     return;
                 }
+                System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ 文件存在");
+                
+                // 检查DWG文件版本
+                try
+                {
+                    var fileInfo = new FileInfo(dwgFile.Path);
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件大小: {fileInfo.Length} bytes");
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件修改时间: {fileInfo.LastWriteTime}");
+                    
+                    // 尝试读取DWG文件头来判断版本
+                    using (var fs = new FileStream(dwgFile.Path, FileMode.Open, FileAccess.Read))
+                    {
+                        var buffer = new byte[6];
+                        fs.Read(buffer, 0, 6);
+                        var version = System.Text.Encoding.ASCII.GetString(buffer);
+                        System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件版本标识: {version}");
+                        
+                        // 常见的DWG版本标识
+                        var versionInfo = version switch
+                        {
+                            "AC1032" => "AutoCAD 2018-2024",
+                            "AC1027" => "AutoCAD 2013-2017", 
+                            "AC1024" => "AutoCAD 2010-2012",
+                            "AC1021" => "AutoCAD 2007-2009",
+                            "AC1018" => "AutoCAD 2004-2006",
+                            "AC1015" => "AutoCAD 2000-2002",
+                            "AC1014" => "AutoCAD R14",
+                            "AC1012" => "AutoCAD R13",
+                            _ => $"未知版本 ({version})"
+                        };
+                        System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件版本: {versionInfo}");
+                        
+                        // 如果是较新版本的文件，给出警告
+                        if (version == "AC1032" || version == "AC1027")
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[INSERT] ⚠️ 警告: 此DWG文件可能与旧版本CAD不兼容");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] 无法读取DWG文件版本信息: {ex.Message}");
+                }
                 
                 // 检查客户端连接状态
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 检查CAD连接状态: {_client.IsConnected}");
+                
+                // 尝试获取CAD版本信息（如果客户端支持的话）
+                try
+                {
+                    // 这里可以添加获取CAD版本的逻辑
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] CAD客户端类型: {_client.GetType().Name}");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] 无法获取CAD版本信息: {ex.Message}");
+                }
+                
                 if (!_client.IsConnected)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] CAD未连接，尝试连接...");
                     StatusText = "正在尝试连接CAD...";
                     await _client.ConnectAsync();
                     
                     if (!_client.IsConnected)
                     {
+                        System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ CAD连接失败");
                         StatusText = "错误: 无法连接到CAD，请确保CAD已启动并加载了BlockManager插件";
                         return;
                     }
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ CAD连接成功");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ CAD已连接");
                 }
                 
                 // 发送插入命令到CAD
@@ -925,23 +1041,114 @@ namespace BlockManager.UI.ViewModels
                     BlockName = Path.GetFileNameWithoutExtension(dwgFile.Name)
                 };
 
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 创建插入请求 - 路径: {insertRequest.BlockPath}, 块名: {insertRequest.BlockName}");
                 StatusText = $"正在发送插入命令...";
+                
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 调用 _client.InsertBlockAsync...");
+                var startTime = DateTime.Now;
+                
+                // 在插入前再次确认连接状态
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入前最终连接检查: {_client.IsConnected}");
+                
                 var result = await _client.InsertBlockAsync(insertRequest);
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                System.Diagnostics.Debug.WriteLine($"[INSERT] InsertBlockAsync 返回结果: {result}");
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入操作耗时: {duration.TotalMilliseconds}ms");
+                
+                // 如果耗时很短（<100ms），可能表示CAD没有真正处理请求
+                if (duration.TotalMilliseconds < 100)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ⚠️ 警告: 插入操作耗时过短，可能CAD未正确处理");
+                }
+                
+                // 插入后再次检查连接状态
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入后连接状态: {_client.IsConnected}");
                 
                 if (result)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ 插入成功");
                     StatusText = $"✅ 已成功插入到CAD: {dwgFile.Name}";
+                    
+                    // 添加到历史记录
+                    System.Diagnostics.Debug.WriteLine($"[HISTORY] 开始添加历史记录: {dwgFile.Name}, 路径: {dwgFile.Path}");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 调用 AddOrUpdateHistoryAsync...");
+                            await _historyService.AddOrUpdateHistoryAsync(dwgFile.Path);
+                            System.Diagnostics.Debug.WriteLine($"[HISTORY] ✅ 成功添加到历史记录: {dwgFile.Name}");
+                            
+                            // 验证是否真的添加了
+                            var historyItems = await _historyService.GetHistoryItemsAsync(5);
+                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 当前历史记录数量: {historyItems.Count}");
+                            foreach (var item in historyItems.Take(3))
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[HISTORY] - {item.FileName} ({item.LastAccessTime:HH:mm:ss})");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[HISTORY] ❌ 添加历史记录失败: {ex.Message}");
+                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 异常详情: {ex}");
+                        }
+                    });
                 }
                 else
                 {
-                    StatusText = $"❌ 插入失败: {dwgFile.Name} (CAD返回失败)";
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 插入失败 - CAD返回false");
+                    
+                    // 根据可能的原因提供详细的错误信息
+                    var errorMessage = $"❌ 插入失败: {dwgFile.Name}";
+                    var suggestions = new List<string>();
+                    
+                    // 常见问题的诊断和建议
+                    suggestions.Add("尝试重新启动CAD并重新加载BlockManager插件");
+                    suggestions.Add("检查CAD是否有活动的命令或正在编辑状态");
+                    suggestions.Add("确认CAD文档已打开且可编辑");
+                    
+                    // 检查插入耗时，如果太短可能是通信问题
+                    if (duration.TotalMilliseconds < 100)
+                    {
+                        suggestions.Insert(0, "CAD通信异常，建议重新连接");
+                    }
+                    
+                    // 检查是否可能是版本兼容性问题（但优先级较低，因为之前能用）
+                    try
+                    {
+                        using (var fs = new FileStream(dwgFile.Path, FileMode.Open, FileAccess.Read))
+                        {
+                            var buffer = new byte[6];
+                            fs.Read(buffer, 0, 6);
+                            var version = System.Text.Encoding.ASCII.GetString(buffer);
+                            
+                            if (version == "AC1032" || version == "AC1027")
+                            {
+                                suggestions.Add("检查DWG文件版本兼容性");
+                            }
+                        }
+                    }
+                    catch { }
+                    
+                    errorMessage += $" - {suggestions[0]}"; // 只显示第一个最重要的建议
+                    System.Diagnostics.Debug.WriteLine($"[INSERT] 建议解决方案:");
+                    for (int i = 0; i < suggestions.Count; i++)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[INSERT] {i + 1}. {suggestions[i]}");
+                    }
+                    
+                    StatusText = errorMessage;
                 }
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 插入异常: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[INSERT] 异常详情: {ex}");
                 StatusText = $"❌ 插入到CAD失败: {ex.Message}";
-                System.Diagnostics.Debug.WriteLine($"InsertToCadAsync异常: {ex}");
             }
+            
+            System.Diagnostics.Debug.WriteLine($"[INSERT] InsertToCadAsync 执行完成");
         }
 
         /// <summary>
@@ -1029,9 +1236,37 @@ namespace BlockManager.UI.ViewModels
                     {
                         System.Windows.Application.Current.Dispatcher.Invoke(() =>
                         {
-                            // 在网格中选中目标文件
-                            SelectedFile = dwgFile;
-                            System.Diagnostics.Debug.WriteLine($"[DEBUG] 已在网格中选中文件: {dwgFile.Name}");
+                            // 在当前文件夹的文件列表中找到对应的文件对象
+                            var actualFile = CurrentFolderFiles.FirstOrDefault(f => 
+                                string.Equals(f.Path, dwgFile.Path, StringComparison.OrdinalIgnoreCase));
+                            
+                            if (actualFile != null)
+                            {
+                                // 在网格中选中目标文件
+                                SelectedFile = actualFile;
+                                System.Diagnostics.Debug.WriteLine($"[DEBUG] 已在网格中选中文件: {actualFile.Name}");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[DEBUG] 在当前文件夹中未找到文件: {dwgFile.Name}");
+                                // 如果找不到，尝试刷新文件夹内容
+                                UpdateCurrentFolderFiles();
+                                
+                                // 再次尝试查找
+                                Task.Delay(50).ContinueWith(__ =>
+                                {
+                                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                                    {
+                                        var retryFile = CurrentFolderFiles.FirstOrDefault(f => 
+                                            string.Equals(f.Path, dwgFile.Path, StringComparison.OrdinalIgnoreCase));
+                                        if (retryFile != null)
+                                        {
+                                            SelectedFile = retryFile;
+                                            System.Diagnostics.Debug.WriteLine($"[DEBUG] 重试后成功选中文件: {retryFile.Name}");
+                                        }
+                                    });
+                                });
+                            }
                         });
                     });
                 }
@@ -1065,8 +1300,11 @@ namespace BlockManager.UI.ViewModels
             // 检查当前节点的直接子节点
             foreach (var child in currentNode.Children)
             {
-                if (child == targetFile)
+                // 使用文件路径比较而不是对象引用比较
+                if (child.Type == "file" && 
+                    string.Equals(child.Path, targetFile.Path, StringComparison.OrdinalIgnoreCase))
                 {
+                    System.Diagnostics.Debug.WriteLine($"[DEBUG] 找到匹配文件: {child.Name} 在文件夹: {currentNode.Name}");
                     return currentNode; // 找到了，当前节点就是父文件夹
                 }
                 
@@ -1100,6 +1338,155 @@ namespace BlockManager.UI.ViewModels
                 len = len / 1024;
             }
             return $"{len:0.##} {sizes[order]}";
+        }
+
+        /// <summary>
+        /// 显示历史记录
+        /// </summary>
+        private async Task ShowHistoryAsync()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] ShowHistoryAsync 开始执行");
+                var historyItems = await _historyService.GetHistoryItemsAsync(20);
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] 从服务获取到 {historyItems.Count} 条历史记录");
+                
+                HistoryItems.Clear();
+                int validCount = 0;
+                foreach (var item in historyItems)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[HISTORY] 检查文件: {item.FileName} -> {item.FilePath}");
+                    // 检查文件是否仍然存在
+                    if (File.Exists(item.FilePath))
+                    {
+                        HistoryItems.Add(item);
+                        validCount++;
+                        System.Diagnostics.Debug.WriteLine($"[HISTORY] ✅ 文件存在，已添加到UI列表");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[HISTORY] ❌ 文件不存在，跳过");
+                    }
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] 有效历史记录数量: {validCount}");
+                
+                // 无论是否有历史记录，都显示弹窗
+                IsHistoryMode = true;
+                
+                if (HistoryItems.Count == 0)
+                {
+                    StatusText = "暂无历史记录";
+                    System.Diagnostics.Debug.WriteLine($"[HISTORY] 无历史记录，但仍显示弹窗");
+                }
+                else
+                {
+                    StatusText = $"显示 {HistoryItems.Count} 条历史记录";
+                    System.Diagnostics.Debug.WriteLine($"[HISTORY] 显示 {HistoryItems.Count} 条历史记录");
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"加载历史记录失败: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] ShowHistoryAsync异常: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 隐藏历史记录
+        /// </summary>
+        private void HideHistory()
+        {
+            IsHistoryMode = false;
+            StatusText = "已隐藏历史记录";
+        }
+
+        /// <summary>
+        /// 历史记录项点击处理
+        /// </summary>
+        private async Task OnHistoryItemClickAsync(HistoryItem? historyItem)
+        {
+            if (historyItem == null)
+                return;
+
+            try
+            {
+                // 隐藏历史记录面板
+                IsHistoryMode = false;
+                
+                // 检查文件是否存在
+                if (!File.Exists(historyItem.FilePath))
+                {
+                    StatusText = $"文件不存在: {historyItem.FileName}";
+                    
+                    // 从历史记录中移除不存在的文件
+                    await _historyService.RemoveHistoryItemAsync(historyItem.FilePath);
+                    return;
+                }
+
+                // 更新历史记录的访问时间
+                await _historyService.AddOrUpdateHistoryAsync(historyItem.FilePath);
+                
+                // 创建TreeNodeDto对象用于定位
+                var dwgFile = new TreeNodeDto
+                {
+                    Name = historyItem.FileName,
+                    Path = historyItem.FilePath,
+                    Type = "file",
+                    IconType = "dwg",
+                    FileInfo = new FileInfoDto
+                    {
+                        Name = historyItem.FileName,
+                        Size = historyItem.FileSize,
+                        LastModified = File.GetLastWriteTime(historyItem.FilePath)
+                    }
+                };
+
+                // 查找对应的PNG预览图
+                var pngPath = Path.ChangeExtension(historyItem.FilePath, ".png");
+                if (File.Exists(pngPath))
+                {
+                    dwgFile.PreviewImagePath = pngPath;
+                }
+
+                // 定位到文件在网格中的位置
+                NavigateToFileInGrid(dwgFile);
+                
+                StatusText = $"已定位到历史文件: {historyItem.FileName}";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"定位历史文件失败: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"OnHistoryItemClickAsync异常: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 清空历史记录
+        /// </summary>
+        private async Task ClearHistoryAsync()
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] ClearHistoryAsync 开始执行");
+                
+                // 清空历史记录
+                await _historyService.ClearHistoryAsync();
+                
+                // 清空UI列表
+                HistoryItems.Clear();
+                
+                // 隐藏历史记录弹窗
+                IsHistoryMode = false;
+                
+                StatusText = "已清空所有历史记录";
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] ✅ 历史记录已清空");
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"清空历史记录失败: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"[HISTORY] ❌ 清空历史记录失败: {ex}");
+            }
         }
 
         #endregion

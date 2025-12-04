@@ -14,7 +14,15 @@ namespace BlockManager.UI.Converters
         {
             if (value is int count)
             {
-                return count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                bool isVisible = count > 0;
+                
+                // 检查是否需要反转
+                if (parameter is string param && param.Equals("Invert", StringComparison.OrdinalIgnoreCase))
+                {
+                    isVisible = !isVisible;
+                }
+                
+                return isVisible ? Visibility.Visible : Visibility.Collapsed;
             }
             return Visibility.Collapsed;
         }

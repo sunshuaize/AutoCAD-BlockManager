@@ -57,6 +57,7 @@ namespace BlockManager.UI
             // 注册IPC客户端
             services.AddSingleton<IBlockManagerClient>(provider => new NamedPipeClient(pipeName));
             services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<IHistoryService, HistoryService>();
             services.AddSingleton<MainWindowViewModel>();
 
             // 注册Views

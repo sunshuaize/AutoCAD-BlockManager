@@ -14,7 +14,6 @@ namespace BlockManager.Adapter._2010
     {
         private readonly string _pipeName;
         private readonly IBlockLibraryService _blockLibraryService;
-        private NamedPipeServerStream _pipeServer;
         private Thread _serverThread;
         private volatile bool _isRunning;
         private volatile bool _disposed;
@@ -53,21 +52,15 @@ namespace BlockManager.Adapter._2010
             if (!_isRunning)
                 return;
 
+            LogDebug("正在停止IPC服务器...");
             _isRunning = false;
-
-            try
-            {
-                if (_pipeServer != null && _pipeServer.IsConnected)
-                {
-                    _pipeServer.Close();
-                }
-            }
-            catch { }
 
             if (_serverThread != null && _serverThread.IsAlive)
             {
-                _serverThread.Join(1000); // 等待1秒
+                _serverThread.Join(2000); // 等待2秒让服务器线程正常退出
             }
+            
+            LogDebug("IPC服务器已停止");
         }
 
         private void RunServer()
@@ -76,45 +69,59 @@ namespace BlockManager.Adapter._2010
             
             while (_isRunning)
             {
+                NamedPipeServerStream pipeServer = null;
                 try
                 {
-                    _pipeServer = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte);
+                    pipeServer = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte);
                     
                     LogDebug("IPC服务器正在等待连接... (管道名: " + _pipeName + ")");
                     
                     // 等待客户端连接
-                    _pipeServer.WaitForConnection();
+                    pipeServer.WaitForConnection();
                     
                     LogDebug("客户端已连接到IPC服务器");
                     
                     // 处理客户端请求
-                    HandleClient(_pipeServer);
+                    HandleClient(pipeServer);
                 }
                 catch (Exception ex)
                 {
                     LogDebug("IPC服务器错误: " + ex.Message);
                     LogDebug("错误详情: " + ex.ToString());
-                    
-                    // 短暂等待后重试
-                    Thread.Sleep(1000);
                 }
                 finally
                 {
+                    // 确保管道被正确关闭和释放
                     try
                     {
-                        if (_pipeServer != null)
+                        if (pipeServer != null)
                         {
-                            _pipeServer.Dispose();
-                            _pipeServer = null;
+                            if (pipeServer.IsConnected)
+                            {
+                                pipeServer.Disconnect();
+                            }
+                            pipeServer.Close();
+                            pipeServer.Dispose();
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        LogDebug("关闭管道时出错: " + ex.Message);
+                    }
+                    
+                    // 短暂等待后重试
+                    if (_isRunning)
+                    {
+                        Thread.Sleep(1000);
+                    }
                 }
             }
         }
 
         private void HandleClient(NamedPipeServerStream pipeServer)
         {
+            LogDebug("[2010 IPC] 客户端连接处理开始");
+            
             while (pipeServer.IsConnected && _isRunning)
             {
                 try
@@ -124,13 +131,18 @@ namespace BlockManager.Adapter._2010
                     ReadExact(pipeServer, lengthBytes, 4);
                     var requestLength = BitConverter.ToInt32(lengthBytes, 0);
 
+                    LogDebug($"[2010 IPC] 收到请求，长度: {requestLength}");
+
                     // 读取请求数据
                     var requestBytes = new byte[requestLength];
                     ReadExact(pipeServer, requestBytes, requestLength);
 
                     // 处理请求
                     var requestJson = Encoding.UTF8.GetString(requestBytes);
+                    LogDebug($"[2010 IPC] 请求内容: {requestJson}");
+                    
                     var response = ProcessRequest(requestJson);
+                    LogDebug($"[2010 IPC] 响应内容: {response}");
 
                     // 发送响应
                     var responseBytes = Encoding.UTF8.GetBytes(response);
@@ -139,13 +151,17 @@ namespace BlockManager.Adapter._2010
                     pipeServer.Write(responseLengthBytes, 0, responseLengthBytes.Length);
                     pipeServer.Write(responseBytes, 0, responseBytes.Length);
                     pipeServer.Flush();
+                    
+                    LogDebug($"[2010 IPC] 响应已发送，长度: {responseBytes.Length}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("处理客户端请求时出错: " + ex.Message);
+                    LogDebug($"[2010 IPC] 处理客户端请求时出错: {ex.Message}");
                     break;
                 }
             }
+            
+            LogDebug("[2010 IPC] 客户端连接处理结束");
         }
 
         private string ProcessRequest(string requestJson)
@@ -243,15 +259,22 @@ namespace BlockManager.Adapter._2010
         {
             try
             {
+                LogDebug("[2010 IPC] 收到插入块请求");
+                
                 var blockPath = ExtractJsonValue(requestJson, "BlockPath");
                 var blockName = ExtractJsonValue(requestJson, "BlockName");
                 
+                LogDebug($"[2010 IPC] 解析请求 - 路径: {blockPath}, 块名: {blockName}");
+                
                 _blockLibraryService.InsertDwgBlock(blockPath, blockName);
+                
+                LogDebug("[2010 IPC] 插入命令已发送到CAD");
                 
                 return "{\"IsSuccess\":true,\"Data\":true}";
             }
             catch (Exception ex)
             {
+                LogDebug($"[2010 IPC] 插入块时发生错误: {ex.Message}");
                 return CreateErrorResponse("INSERT_BLOCK_ERROR", ex.Message);
             }
         }

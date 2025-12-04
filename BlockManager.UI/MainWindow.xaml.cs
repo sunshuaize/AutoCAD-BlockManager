@@ -16,8 +16,9 @@ using System.Runtime.InteropServices;
 using System.Windows.Interop;
 using BlockManager.UI.Views;
 using BlockManager.UI.Services;
-using Microsoft.Extensions.DependencyInjection;
+using BlockManager.UI.Models;
 using System.Reflection;
+using CommunityToolkit.Mvvm.Input;
 
 namespace BlockManager.UI;
 
@@ -27,6 +28,7 @@ namespace BlockManager.UI;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
+    private bool _isHistoryLoading = false;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
@@ -454,16 +456,29 @@ public partial class MainWindow : Window
     /// </summary>
     private void TreeView_Insert(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[UI] TreeView_Insert 事件被触发");
+        
         if (sender is MenuItem menuItem && 
             menuItem.Parent is ContextMenu contextMenu &&
             contextMenu.PlacementTarget is Border border &&
             border.DataContext is TreeNodeDto treeNode)
         {
+            System.Diagnostics.Debug.WriteLine($"[UI] TreeView_Insert 获取到节点: {treeNode.Name}, 类型: {treeNode.Type}, 图标: {treeNode.IconType}");
+            
             // 插入到CAD
             if (treeNode.Type == "file" && treeNode.IconType == "dwg")
             {
+                System.Diagnostics.Debug.WriteLine($"[UI] TreeView_Insert 调用 InsertToCadCommand.Execute");
                 _viewModel.InsertToCadCommand?.Execute(treeNode);
             }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[UI] ❌ TreeView_Insert 不是DWG文件，跳过插入");
+            }
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[UI] ❌ TreeView_Insert 无法获取节点信息");
         }
     }
 
@@ -549,15 +564,22 @@ public partial class MainWindow : Window
     /// </summary>
     private void Grid_InsertToCad(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine($"[UI] Grid_InsertToCad 事件被触发");
+        
         if (sender is MenuItem menuItem && 
             menuItem.Parent is ContextMenu contextMenu &&
             contextMenu.PlacementTarget is Border border &&
             border.DataContext is TreeNodeDto dwgFile)
         {
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] Grid_InsertToCad被调用: {dwgFile.Name}");
+            System.Diagnostics.Debug.WriteLine($"[UI] Grid_InsertToCad 获取到文件: {dwgFile.Name}");
+            System.Diagnostics.Debug.WriteLine($"[UI] 调用 InsertToCadCommand.Execute");
             
             // 调用ViewModel的插入CAD命令
             _viewModel.InsertToCadCommand?.Execute(dwgFile);
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[UI] ❌ Grid_InsertToCad 无法获取文件信息");
         }
     }
 
@@ -665,5 +687,65 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    /// <summary>
+    /// 历史记录按钮鼠标进入事件
+    /// </summary>
+    private void HistoryButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        // 防止重复触发
+        if (_isHistoryLoading || _viewModel.IsHistoryMode)
+            return;
+            
+        _isHistoryLoading = true;
+        
+        try
+        {
+            // 显示历史记录
+            if (_viewModel.ShowHistoryCommand.CanExecute(null))
+            {
+                _viewModel.ShowHistoryCommand.Execute(null);
+            }
+        }
+        finally
+        {
+            _isHistoryLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// 历史记录弹窗鼠标离开事件
+    /// </summary>
+    private void HistoryPopup_MouseLeave(object sender, MouseEventArgs e)
+    {
+        // 延迟隐藏，给用户一些缓冲时间
+        Task.Delay(200).ContinueWith(_ =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (_viewModel.HideHistoryCommand.CanExecute(null))
+                {
+                    _viewModel.HideHistoryCommand.Execute(null);
+                }
+            });
+        });
+    }
+
+    /// <summary>
+    /// 历史记录项点击事件
+    /// </summary>
+    private void HistoryItem_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border border && border.DataContext is HistoryItem historyItem)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DEBUG] 历史记录项点击: {historyItem.FileName}");
+            
+            if (_viewModel.HistoryItemClickCommand.CanExecute(historyItem))
+            {
+                _viewModel.HistoryItemClickCommand.Execute(historyItem);
+            }
+        }
+    }
+
 
 }
