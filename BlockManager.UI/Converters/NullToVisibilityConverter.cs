@@ -12,15 +12,15 @@ namespace BlockManager.UI.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            bool isNull = value == null;
+            bool isNullOrEmpty = value == null || (value is string str && string.IsNullOrEmpty(str));
             
             // 检查是否需要反转
             bool invert = parameter is string param && param.Equals("Invert", StringComparison.OrdinalIgnoreCase);
             
             if (invert)
-                isNull = !isNull;
+                isNullOrEmpty = !isNullOrEmpty;
                 
-            return isNull ? Visibility.Collapsed : Visibility.Visible;
+            return isNullOrEmpty ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

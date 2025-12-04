@@ -31,6 +31,10 @@ namespace BlockManager.UI.ViewModels
         private ObservableCollection<TreeNodeDto> _currentFolderFiles = new();
         private bool _showDefaultHint = true;
         private bool _showGrid = false;
+        private string _searchText = string.Empty;
+        private ObservableCollection<TreeNodeDto> _searchResults = new();
+        private bool _isSearchMode = false;
+        private TreeNodeDto? _selectedFile;
 
         public MainWindowViewModel(IBlockManagerClient client, ISettingsService settingsService)
         {
@@ -43,6 +47,9 @@ namespace BlockManager.UI.ViewModels
             FileDoubleClickCommand = new AsyncRelayCommand<TreeNodeDto>(HandleFileDoubleClickAsync);
             RefreshCommand = new AsyncRelayCommand(RefreshLibraryAsync);
             SelectDwgFileCommand = new AsyncRelayCommand<TreeNodeDto>(SelectDwgFileAsync);
+            InsertToCadCommand = new AsyncRelayCommand<TreeNodeDto>(InsertToCadAsync);
+            SearchCommand = new RelayCommand<string>(ExecuteSearch);
+            ClearSearchCommand = new RelayCommand(ClearSearch);
             
             // 订阅文件变化事件
             _client.FileChanged += OnFileChanged;
@@ -91,16 +98,16 @@ namespace BlockManager.UI.ViewModels
                         // 选择文件夹时，显示网格
                         UpdateCurrentFolderFiles();
                         CurrentPreview = null;
+                        SelectedFile = null; // 清除选中的文件
                         ShowDefaultHint = false;
                         ShowGrid = true;
+                        System.Diagnostics.Debug.WriteLine($"[DEBUG] 切换到文件夹网格模式: {value.Name}");
                     }
                     else if (value?.Type == "file" && value?.IconType == "dwg")
                     {
-                        // 选择DWG文件时，直接显示PNG预览
-                        CurrentFolderFiles.Clear();
-                        ShowDefaultHint = false;
-                        ShowGrid = false;
-                        _ = LoadDwgPreviewAsync(value);
+                        // 选择DWG文件时，定位到其父文件夹并在网格中选中该文件
+                        System.Diagnostics.Debug.WriteLine($"[DEBUG] TreeView选择DWG文件，准备定位到网格: {value.Name}");
+                        NavigateToFileInGrid(value);
                     }
                     else
                     {
@@ -186,6 +193,68 @@ namespace BlockManager.UI.ViewModels
             set => SetProperty(ref _showGrid, value);
         }
 
+        /// <summary>
+        /// 搜索文本
+        /// </summary>
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    // 实时搜索
+                    if (string.IsNullOrWhiteSpace(value))
+                    {
+                        ClearSearch();
+                    }
+                    else
+                    {
+                        ExecuteSearch(value);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 搜索结果
+        /// </summary>
+        public ObservableCollection<TreeNodeDto> SearchResults
+        {
+            get => _searchResults;
+            set => SetProperty(ref _searchResults, value);
+        }
+
+        /// <summary>
+        /// 是否处于搜索模式
+        /// </summary>
+        public bool IsSearchMode
+        {
+            get => _isSearchMode;
+            set => SetProperty(ref _isSearchMode, value);
+        }
+
+        /// <summary>
+        /// 选中的文件
+        /// </summary>
+        public TreeNodeDto? SelectedFile
+        {
+            get => _selectedFile;
+            set
+            {
+                if (SetProperty(ref _selectedFile, value))
+                {
+                    // 当选中文件时，可以触发预览或其他操作
+                    if (value != null)
+                    {
+                        StatusText = $"已选中: {value.Name}";
+                        // 这里可以添加其他选中后的操作，比如自动预览
+                        // _ = Task.Run(() => SelectDwgFileAsync(value));
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region 命令
@@ -209,6 +278,21 @@ namespace BlockManager.UI.ViewModels
         /// 选择DWG文件命令
         /// </summary>
         public ICommand SelectDwgFileCommand { get; }
+
+        /// <summary>
+        /// 插入到CAD命令
+        /// </summary>
+        public ICommand InsertToCadCommand { get; }
+
+        /// <summary>
+        /// 搜索命令
+        /// </summary>
+        public ICommand SearchCommand { get; }
+
+        /// <summary>
+        /// 清空搜索命令
+        /// </summary>
+        public ICommand ClearSearchCommand { get; }
 
         #endregion
 
@@ -622,11 +706,90 @@ namespace BlockManager.UI.ViewModels
             // 在UI线程上更新状态
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                StatusText = $"文件已{e.ChangeType}: {System.IO.Path.GetFileName(e.FilePath)}";
+                StatusText = $"文件已更新: {e.FilePath}";
             });
+        }
 
-            // 如果需要，可以在这里刷新文件树
-            // await RefreshLibraryAsync();
+        /// <summary>
+        /// 执行搜索
+        /// </summary>
+        private void ExecuteSearch(string? searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText) || RootNode == null)
+            {
+                ClearSearch();
+                return;
+            }
+
+            try
+            {
+                var results = new List<TreeNodeDto>();
+                SearchInNode(RootNode, searchText.Trim(), results);
+
+                SearchResults.Clear();
+                foreach (var result in results.Take(50)) // 限制结果数量
+                {
+                    SearchResults.Add(result);
+                }
+
+                IsSearchMode = SearchResults.Count > 0;
+                StatusText = $"找到 {SearchResults.Count} 个匹配项";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"搜索失败: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 在节点中递归搜索
+        /// </summary>
+        private void SearchInNode(TreeNodeDto node, string searchText, List<TreeNodeDto> results)
+        {
+            // 搜索当前节点，但只添加文件类型的节点（过滤掉文件夹）
+            if (IsMatch(node, searchText) && node.Type == "file")
+            {
+                results.Add(node);
+            }
+
+            // 递归搜索子节点
+            foreach (var child in node.Children)
+            {
+                SearchInNode(child, searchText, results);
+            }
+        }
+
+        /// <summary>
+        /// 判断节点是否匹配搜索条件
+        /// </summary>
+        private bool IsMatch(TreeNodeDto node, string searchText)
+        {
+            if (string.IsNullOrEmpty(node.Name))
+                return false;
+
+            // 文件名匹配（不区分大小写）
+            if (node.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // 路径匹配
+            if (!string.IsNullOrEmpty(node.Path) && 
+                node.Path.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// 清空搜索
+        /// </summary>
+        private void ClearSearch()
+        {
+            SearchResults.Clear();
+            IsSearchMode = false;
+            if (!string.IsNullOrEmpty(SearchText))
+            {
+                StatusText = "已清空搜索";
+            }
         }
 
         /// <summary>
@@ -661,56 +824,123 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         private async Task SelectDwgFileAsync(TreeNodeDto? dwgFile)
         {
-            if (dwgFile == null) return;
+            System.Diagnostics.Debug.WriteLine($"[DEBUG] SelectDwgFileAsync被调用，参数: {dwgFile?.Name ?? "null"}");
+            
+            if (dwgFile == null) 
+            {
+                System.Diagnostics.Debug.WriteLine("[DEBUG] dwgFile为null，退出方法");
+                StatusText = "错误: 未选择文件";
+                return;
+            }
 
             try
             {
-                // 设置显示状态 - 隐藏网格，显示预览
-                ShowGrid = false;
-                ShowDefaultHint = false;
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] SelectDwgFileAsync开始处理: {dwgFile.Name}");
+                
+                // 设置选中的文件
+                SelectedFile = dwgFile;
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] SelectedFile已设置: {SelectedFile?.Name}");
                 
                 // 查找对应的PNG预览图
                 var pngPath = Path.ChangeExtension(dwgFile.Path, ".png");
-                StatusText = $"查找PNG文件: {pngPath}";
+                StatusText = $"正在加载预览: {dwgFile.Name}";
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] PNG路径: {pngPath}, 存在: {File.Exists(pngPath)}");
+                
+                // 创建预览数据（无论是否有PNG图片）
+                var previewData = new PreviewDto
+                {
+                    FileName = dwgFile.Name,
+                    FilePath = dwgFile.Path,
+                    PreviewImagePath = File.Exists(pngPath) ? pngPath : null,
+                    FileSize = dwgFile.FileInfo?.Size ?? 0,
+                    LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
+                    IsSuccess = File.Exists(pngPath),
+                    ErrorMessage = File.Exists(pngPath) ? null : "未找到对应的PNG预览图"
+                };
+
+                CurrentPreview = previewData;
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] CurrentPreview已设置: {CurrentPreview != null}");
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] PreviewImagePath: '{CurrentPreview.PreviewImagePath}'");
                 
                 if (File.Exists(pngPath))
                 {
-                    // 创建预览数据
-                    var previewData = new PreviewDto
-                    {
-                        FileName = dwgFile.Name,
-                        FilePath = dwgFile.Path,
-                        PreviewImagePath = pngPath,
-                        FileSize = dwgFile.FileInfo?.Size ?? 0,
-                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
-                        IsSuccess = true
-                    };
-
-                    CurrentPreview = previewData;
-                    StatusText = $"已加载预览: {dwgFile.Name} -> {pngPath}";
+                    StatusText = $"预览已加载: {dwgFile.Name}";
                 }
                 else
                 {
-                    // 没有PNG预览图，创建基本信息
-                    var previewData = new PreviewDto
-                    {
-                        FileName = dwgFile.Name,
-                        FilePath = dwgFile.Path,
-                        PreviewImagePath = null,
-                        FileSize = dwgFile.FileInfo?.Size ?? 0,
-                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
-                        IsSuccess = false,
-                        ErrorMessage = "未找到对应的PNG预览图"
-                    };
-
-                    CurrentPreview = previewData;
-                    StatusText = $"未找到预览图: {dwgFile.Name}";
+                    StatusText = $"已选中文件: {dwgFile.Name} (无预览图)";
                 }
+                
+                // 切换到预览模式
+                ShowGrid = false;
+                ShowDefaultHint = false;
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] 视图状态 - ShowGrid: {ShowGrid}, ShowDefaultHint: {ShowDefaultHint}");
             }
             catch (Exception ex)
             {
                 StatusText = $"加载预览失败: {ex.Message}";
                 CurrentPreview = null;
+            }
+        }
+
+        /// <summary>
+        /// 插入到CAD
+        /// </summary>
+        private async Task InsertToCadAsync(TreeNodeDto? dwgFile)
+        {
+            if (dwgFile == null) 
+            {
+                StatusText = "错误: 未选择文件";
+                return;
+            }
+
+            try
+            {
+                StatusText = $"正在插入到CAD: {dwgFile.Name}";
+                
+                // 检查文件是否存在
+                if (!File.Exists(dwgFile.Path))
+                {
+                    StatusText = $"错误: 文件不存在 - {dwgFile.Path}";
+                    return;
+                }
+                
+                // 检查客户端连接状态
+                if (!_client.IsConnected)
+                {
+                    StatusText = "正在尝试连接CAD...";
+                    await _client.ConnectAsync();
+                    
+                    if (!_client.IsConnected)
+                    {
+                        StatusText = "错误: 无法连接到CAD，请确保CAD已启动并加载了BlockManager插件";
+                        return;
+                    }
+                }
+                
+                // 发送插入命令到CAD
+                var insertRequest = new InsertBlockRequest
+                {
+                    BlockPath = dwgFile.Path,
+                    BlockName = Path.GetFileNameWithoutExtension(dwgFile.Name)
+                };
+
+                StatusText = $"正在发送插入命令...";
+                var result = await _client.InsertBlockAsync(insertRequest);
+                
+                if (result)
+                {
+                    StatusText = $"✅ 已成功插入到CAD: {dwgFile.Name}";
+                }
+                else
+                {
+                    StatusText = $"❌ 插入失败: {dwgFile.Name} (CAD返回失败)";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"❌ 插入到CAD失败: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"InsertToCadAsync异常: {ex}");
             }
         }
 
@@ -766,6 +996,92 @@ namespace BlockManager.UI.ViewModels
                 StatusText = $"加载预览失败: {ex.Message}";
                 CurrentPreview = null;
             }
+        }
+
+        /// <summary>
+        /// 导航到文件在网格中的位置
+        /// </summary>
+        private void NavigateToFileInGrid(TreeNodeDto dwgFile)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] ViewModel导航到文件: {dwgFile.Name}");
+                
+                // 找到文件的父文件夹
+                var parentFolder = FindParentFolder(dwgFile);
+                if (parentFolder != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DEBUG] 找到父文件夹: {parentFolder.Name}");
+                    
+                    // 选中父文件夹，这会触发网格显示
+                    // 注意：这里需要避免递归调用，所以直接设置私有字段
+                    _selectedNode = parentFolder;
+                    OnPropertyChanged(nameof(SelectedNode));
+                    
+                    // 手动触发文件夹切换逻辑
+                    UpdateCurrentFolderFiles();
+                    CurrentPreview = null;
+                    ShowDefaultHint = false;
+                    ShowGrid = true;
+                    
+                    // 延迟选中目标文件
+                    Task.Delay(100).ContinueWith(_ =>
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            // 在网格中选中目标文件
+                            SelectedFile = dwgFile;
+                            System.Diagnostics.Debug.WriteLine($"[DEBUG] 已在网格中选中文件: {dwgFile.Name}");
+                        });
+                    });
+                }
+                else
+                {
+                    StatusText = $"无法找到文件 {dwgFile.Name} 的父文件夹";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"导航到文件失败: {ex.Message}";
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] 导航失败: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 查找文件的父文件夹
+        /// </summary>
+        private TreeNodeDto? FindParentFolder(TreeNodeDto targetFile)
+        {
+            if (RootNode == null) return null;
+            
+            return FindParentFolderRecursive(RootNode, targetFile);
+        }
+
+        /// <summary>
+        /// 递归查找父文件夹
+        /// </summary>
+        private TreeNodeDto? FindParentFolderRecursive(TreeNodeDto currentNode, TreeNodeDto targetFile)
+        {
+            // 检查当前节点的直接子节点
+            foreach (var child in currentNode.Children)
+            {
+                if (child == targetFile)
+                {
+                    return currentNode; // 找到了，当前节点就是父文件夹
+                }
+                
+                // 如果子节点是文件夹，递归搜索
+                if (child.Type == "folder")
+                {
+                    var result = FindParentFolderRecursive(child, targetFile);
+                    if (result != null)
+                    {
+                        return result;
+                    }
+                }
+            }
+            
+            return null;
         }
 
         /// <summary>

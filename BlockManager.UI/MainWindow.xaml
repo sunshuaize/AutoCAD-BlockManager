@@ -25,10 +25,11 @@
         <converters:Base64ToImageConverter x:Key="Base64ToImageConverter"/>
         <converters:IconConverter x:Key="IconConverter"/>
         <converters:ModernIconConverter x:Key="ModernIconConverter"/>
-        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <converters:FileSizeConverter x:Key="FileSizeConverter"/>
         <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
         
         <!-- Windsurf 风格 TreeView 样式 -->
         <Style x:Key="WindsurfTreeViewItemStyle" TargetType="TreeViewItem">
@@ -224,12 +225,13 @@
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>   <!-- Logo -->
+                    <ColumnDefinition Width="*"/>      <!-- 搜索框 -->
+                    <ColumnDefinition Width="Auto"/>   <!-- 功能按钮 -->
                 </Grid.ColumnDefinitions>
                 
                 <!-- 左侧：Logo -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,16,0" VerticalAlignment="Center">
                     <!-- BlockManager Logo -->
                     <TextBlock Text="BlockManager" 
                                FontSize="14"
@@ -238,68 +240,97 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
                 
-                <!-- 中间：搜索框 -->
-                <Border Grid.Column="0" Grid.ColumnSpan="2"
-                        Width="320" Height="28" 
-                        Background="{StaticResource SearchBrush}"
-                        BorderBrush="Transparent"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                <!-- 中间：搜索框容器 -->
+                <Grid Grid.Column="1" Margin="16,8,16,8">
+                    <!-- 搜索框 -->
+                    <Border x:Name="SearchBoxBorder"
+                            Background="{StaticResource SearchBrush}"
+                            BorderBrush="Gray"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Center"
+                            MinWidth="300"
+                            MaxWidth="500">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 搜索图标 -->
+                            <Canvas Grid.Column="0" Width="14" Height="14" Margin="8,0,8,0">
+                                <!-- 放大镜圆圈 -->
+                                <Ellipse Width="8" Height="8" 
+                                         Canvas.Left="1.5" Canvas.Top="1.5"
+                                         Stroke="{StaticResource TextTertiaryBrush}"
+                                         StrokeThickness="1.5"
+                                         Fill="Transparent"/>
+                                <!-- 放大镜手柄 -->
+                                <Rectangle Width="5" Height="1.5" 
+                                           Canvas.Left="8.5" Canvas.Top="7.2"
+                                           Fill="{StaticResource TextTertiaryBrush}"
+                                           RenderTransformOrigin="0,0.5">
+                                    <Rectangle.RenderTransform>
+                                        <RotateTransform Angle="45"/>
+                                    </Rectangle.RenderTransform>
+                                </Rectangle>
+                            </Canvas>
+                            
+                            <!-- 搜索输入框 -->
+                            <TextBox Grid.Column="1" 
+                                     x:Name="SearchTextBox"
+                                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     VerticalContentAlignment="Center"
+                                     VerticalAlignment="Center"
+                                     Padding="0,2,8,2"
+                                     Margin="0"
+                                     GotFocus="SearchTextBox_GotFocus"
+                                     LostFocus="SearchTextBox_LostFocus">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Style.Triggers>
+                                            <Trigger Property="Text" Value="">
+                                                <Setter Property="Background">
+                                                    <Setter.Value>
+                                                        <VisualBrush AlignmentX="Left" AlignmentY="Center" Stretch="None">
+                                                            <VisualBrush.Visual>
+                                                                <TextBlock Text="搜索块库..." 
+                                                                           FontSize="12"
+                                                                           Foreground="{StaticResource TextSecondaryBrush}" 
+                                                                           Margin="2,0,0,0"/>
+                                                            </VisualBrush.Visual>
+                                                        </VisualBrush>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                        </Grid>
                         
-                        <!-- 搜索图标 -->
-                        <Canvas Grid.Column="0" Width="14" Height="14" Margin="8,0,8,0">
-                            <!-- 放大镜圆圈 -->
-                            <Ellipse Width="8" Height="8" 
-                                     Canvas.Left="1.5" Canvas.Top="1.5"
-                                     Stroke="{StaticResource TextTertiaryBrush}"
-                                     StrokeThickness="1.5"
-                                     Fill="Transparent"/>
-                            <!-- 放大镜手柄 -->
-                            <Rectangle Width="5" Height="1.5" 
-                                       Canvas.Left="8.5" Canvas.Top="7.2"
-                                       Fill="{StaticResource TextTertiaryBrush}"
-                                       RenderTransformOrigin="0,0.5">
-                                <Rectangle.RenderTransform>
-                                    <RotateTransform Angle="45"/>
-                                </Rectangle.RenderTransform>
-                            </Rectangle>
-                        </Canvas>
-                        
-                        <!-- 搜索输入框 -->
-                        <TextBox Grid.Column="1" 
-                                 Text="搜索块库..."
-                                 FontSize="12"
-                                 Foreground="{StaticResource TextSecondaryBrush}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 VerticalContentAlignment="Center"
-                                 VerticalAlignment="Center"
-                                 Padding="0,2,8,2"
-                                 Margin="0"/>
-                    </Grid>
+                        <!-- 悬停效果触发器 -->
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
                     
-                    <!-- 悬停效果触发器 -->
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                </Border>
+                </Grid>
                 
                 <!-- 右侧：功能按钮 + 窗口控制 -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- 功能按钮组 -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
                         <!-- 提示按钮 -->
@@ -520,13 +551,25 @@
                                   Style="{StaticResource WindsurfTreeViewStyle}"
                                   ItemsSource="{Binding RootNode.Children}"
                                   SelectedItemChanged="TreeView_SelectedItemChanged"
-                                  MouseDoubleClick="TreeView_MouseDoubleClick">
+                                  MouseDoubleClick="TreeView_MouseDoubleClick"
+                                  PreviewMouseLeftButtonDown="TreeView_PreviewMouseLeftButtonDown">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}" 
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Margin="2"/>
+                                <Border Background="Transparent" 
+                                        Padding="2">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="预览" Click="TreeView_Preview"/>
+                                            <MenuItem Header="插入到CAD" Click="TreeView_Insert"/>
+                                            <Separator/>
+                                            <MenuItem Header="在文件夹中显示" Click="TreeView_ShowInFolder"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <TextBlock Text="{Binding Name}" 
+                                               VerticalAlignment="Center"
+                                               FontSize="13"
+                                               Margin="2"/>
+                                </Border>
                             </HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>
                         </TreeView>
@@ -584,7 +627,7 @@
                                                       Direction="270"/>
                                 </Border.Effect>
                                 <Image Name="PreviewImage"
-                                       Source="{Binding CurrentPreview.PreviewImagePath}"
+                                       Source="{Binding CurrentPreview.PreviewImagePath, TargetNullValue={x:Null}}"
                                        Stretch="Uniform"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
@@ -693,46 +736,120 @@
                                   Padding="24"
                                   Visibility="{Binding ShowGrid, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!-- DWG文件网格 -->
-                    <ItemsControl Name="DwgFilesGrid" 
-                                  ItemsSource="{Binding CurrentFolderFiles}">
-                        <ItemsControl.ItemsPanel>
+                    <ListBox Name="DwgFilesGrid" 
+                             ItemsSource="{Binding CurrentFolderFiles}"
+                             SelectedItem="{Binding SelectedFile}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             MouseDoubleClick="DwgFilesGrid_MouseDoubleClick">
+                        <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel Orientation="Horizontal" 
                                            ItemWidth="200" 
                                            ItemHeight="180"/>
                             </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                        </ListBox.ItemsPanel>
                         
-                        <ItemsControl.ItemTemplate>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="ItemBorder" Background="Transparent">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="Transparent"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="Transparent"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        
+                        <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="White"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="0"
-                                        CornerRadius="12"
-                                        Margin="8"
-                                        Cursor="Hand"
-                                        MouseLeftButtonDown="DwgFile_Click">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#000000" 
-                                                          Opacity="0.06" 
-                                                          BlurRadius="16" 
-                                                          ShadowDepth="4" 
-                                                          Direction="270"/>
-                                    </Border.Effect>
+                                <Border x:Name="ItemBorder">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="预览" 
+                                                      Click="Grid_Preview">
+                                                <MenuItem.Icon>
+                                                    <TextBlock Text="👁" FontSize="14"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="插入到CAD" 
+                                                      Click="Grid_InsertToCad">
+                                                <MenuItem.Icon>
+                                                    <TextBlock Text="📐" FontSize="14"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator/>
+                                            <MenuItem Header="在文件夹中显示" 
+                                                      Click="Grid_ShowInFolder">
+                                                <MenuItem.Icon>
+                                                    <TextBlock Text="📁" FontSize="14"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Border.Style>
                                         <Style TargetType="Border">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+                                            <Setter Property="BorderThickness" Value="2"/>
+                                            <Setter Property="CornerRadius" Value="12"/>
+                                            <Setter Property="Margin" Value="8"/>
+                                            <Setter Property="Cursor" Value="Hand"/>
+                                            <Setter Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect Color="#000000" 
+                                                                      Opacity="0.06" 
+                                                                      BlurRadius="16" 
+                                                                      ShadowDepth="4" 
+                                                                      Direction="270"/>
+                                                </Setter.Value>
+                                            </Setter>
                                             <Style.Triggers>
+                                                <!-- 鼠标悬停效果 -->
                                                 <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#3B82F6"/>
+                                                    <Setter Property="Background" Value="#F8FAFF"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
                                                             <DropShadowEffect Color="#3B82F6" 
-                                                                              Opacity="0.15" 
+                                                                              Opacity="0.2" 
                                                                               BlurRadius="20" 
                                                                               ShadowDepth="6" 
                                                                               Direction="270"/>
                                                         </Setter.Value>
                                                     </Setter>
                                                 </Trigger>
+                                                <!-- 选中效果 -->
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type ListBoxItem}}, Path=IsSelected}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#2196F3"/>
+                                                    <Setter Property="Background" Value="#EBF4FF"/>
+                                                    <Setter Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect Color="#2196F3" 
+                                                                              Opacity="0.3" 
+                                                                              BlurRadius="24" 
+                                                                              ShadowDepth="8" 
+                                                                              Direction="270"/>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
@@ -751,7 +868,7 @@
                                             <Grid>
                                                 <!-- PNG预览图片 -->
                                                 <Image Name="PreviewImage"
-                                                       Source="{Binding PreviewImagePath}"
+                                                       Source="{Binding PreviewImagePath, TargetNullValue={x:Null}}"
                                                        Stretch="Uniform"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
@@ -793,8 +910,8 @@
                                     </Grid>
                                 </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </ScrollViewer>
                 </Grid>
             </Border>
@@ -834,7 +951,109 @@
                 </Border>
             </Grid>
         </Border>
+        
             </Grid>
         </Border>
+        
+        <!-- 搜索结果悬浮窗 - 使用Popup精确定位 -->
+        <Popup x:Name="SearchResultsPopup"
+               PlacementTarget="{Binding ElementName=SearchBoxBorder}"
+               Placement="Bottom"
+               AllowsTransparency="True"
+               StaysOpen="False"
+               IsOpen="{Binding IsSearchMode}"
+               PopupAnimation="Slide">
+            <Border Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    MaxHeight="400"
+                    MinWidth="{Binding ElementName=SearchBoxBorder, Path=ActualWidth}"
+                    MaxWidth="{Binding ElementName=SearchBoxBorder, Path=ActualWidth}">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" 
+                                      Opacity="0.2" 
+                                      BlurRadius="25" 
+                                      ShadowDepth="10" 
+                                      Direction="270"/>
+                </Border.Effect>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <!-- 调试信息 -->
+                        <TextBlock Text="{Binding SearchResults.Count, StringFormat='搜索结果数量: {0}'}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="12,8,12,4"
+                                   Background="Transparent"/>
+                        
+                        <ItemsControl ItemsSource="{Binding SearchResults}"
+                                      Margin="4,0,4,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="Transparent"
+                                            Margin="0,1"
+                                            Padding="12,8"
+                                            CornerRadius="4"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="SearchResult_MouseDown">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="1"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#E3F2FD"/>
+                                                        <Setter Property="BorderBrush" Value="#2196F3"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- 文件类型图标 -->
+                                            <Grid Grid.Column="0"
+                                                  Width="16" Height="16"
+                                                  Margin="0,0,8,0"
+                                                  VerticalAlignment="Center">
+                                                <!-- DWG文件图标 -->
+                                                <Border Background="{StaticResource PrimaryBrush}"
+                                                        Width="12" Height="12"
+                                                        CornerRadius="2"
+                                                        Visibility="{Binding IconType, Converter={StaticResource StringToVisibilityConverter}, ConverterParameter=dwg}"/>
+                                                <!-- 文件夹图标 -->
+                                                <Path Fill="{StaticResource TextSecondaryBrush}"
+                                                      Data="M4 4h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"
+                                                      Stretch="Uniform"
+                                                      Width="12" Height="12"
+                                                      Visibility="{Binding IconType, Converter={StaticResource StringToVisibilityConverter}, ConverterParameter=folder}"/>
+                                            </Grid>
+                                            
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Name}" 
+                                                           FontSize="13"
+                                                           FontWeight="Medium"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Path}" 
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Popup>
     </Grid>
 </Window>
