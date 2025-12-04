@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using BlockManager.IPC.Contracts;
@@ -15,10 +17,10 @@ namespace BlockManager.UI.ViewModels
         private TreeNodeDto? _rootNode;
         private TreeNodeDto? _selectedNode;
         private PreviewDto? _currentPreview;
-        private string _statusText = "正在初始化...";
+        private string _statusText = "就绪";
         private bool _isLoading;
         private string _connectionStatus = "未连接";
-        private string _connectionStatusColor = "Red";
+        private string _connectionStatusColor = "#EF4444";
 
         public MainWindowViewModel(IBlockManagerClient client)
         {
@@ -164,19 +166,177 @@ namespace BlockManager.UI.ViewModels
         {
             try
             {
-                StatusText = "正在连接...";
-                
-                // 延迟确保AutoCAD的IPC服务器完全启动
-                await Task.Delay(100);
-                
+                // 先加载本地目录
                 StatusText = "正在加载块文件夹...";
+                await LoadLocalDirectoryAsync();
                 
-                // 使用重试机制自动加载块库
-                await LoadLibraryWithRetryAsync();
+                // 然后尝试连接IPC（用于状态显示）
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(1000); // 延迟一秒再尝试连接
+                        await CheckIpcConnectionAsync();
+                    }
+                    catch
+                    {
+                        // IPC连接失败不影响文件加载
+                    }
+                });
             }
             catch (Exception ex)
             {
-                StatusText = $"自动加载失败: {ex.Message}";
+                StatusText = $"加载失败: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 加载本地目录
+        /// </summary>
+        private async Task LoadLocalDirectoryAsync()
+        {
+            await Task.Run(() =>
+            {
+                var rootPath = @"c:\Users\PC\Desktop\BlockManager\Block";
+                
+                if (!Directory.Exists(rootPath))
+                {
+                    throw new DirectoryNotFoundException($"目录不存在: {rootPath}");
+                }
+
+                StatusText = "正在扫描本地目录...";
+                
+                var rootNode = new TreeNodeDto
+                {
+                    Name = "Block",
+                    Path = rootPath,
+                    Type = "folder",
+                    IconType = "folder"
+                };
+
+                LoadDirectoryRecursive(rootNode, rootPath);
+                
+                RootNode = rootNode;
+                StatusText = $"已加载本地目录 (节点数: {rootNode.Children.Count})";
+                ConnectionStatus = "本地模式";
+                ConnectionStatusColor = "#6B7280"; // 灰色表示本地模式
+            });
+        }
+
+        /// <summary>
+        /// 递归加载目录结构
+        /// </summary>
+        private void LoadDirectoryRecursive(TreeNodeDto parentNode, string directoryPath)
+        {
+            try
+            {
+                // 加载子目录
+                var directories = Directory.GetDirectories(directoryPath)
+                    .Where(d => !Path.GetFileName(d).StartsWith(".")) // 忽略隐藏目录
+                    .OrderBy(d => Path.GetFileName(d));
+
+                foreach (var dir in directories)
+                {
+                    var dirNode = new TreeNodeDto
+                    {
+                        Name = Path.GetFileName(dir),
+                        Path = dir,
+                        Type = "folder",
+                        IconType = "folder"
+                    };
+
+                    LoadDirectoryRecursive(dirNode, dir);
+                    parentNode.Children.Add(dirNode);
+                }
+
+                // 加载文件
+                var files = Directory.GetFiles(directoryPath)
+                    .Where(f => IsValidBlockFile(f))
+                    .OrderBy(f => Path.GetFileName(f));
+
+                foreach (var file in files)
+                {
+                    var fileName = Path.GetFileName(file);
+                    var extension = Path.GetExtension(file).ToLowerInvariant();
+                    
+                    var fileNode = new TreeNodeDto
+                    {
+                        Name = fileName,
+                        Path = file,
+                        Type = "file",
+                        IconType = GetIconType(extension),
+                        FileInfo = new FileInfoDto
+                        {
+                            Name = fileName,
+                            Size = new System.IO.FileInfo(file).Length,
+                            LastModified = new System.IO.FileInfo(file).LastWriteTime
+                        }
+                    };
+
+                    parentNode.Children.Add(fileNode);
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // 忽略无权限访问的目录
+            }
+            catch (Exception)
+            {
+                // 忽略其他错误，继续处理其他目录
+            }
+        }
+
+        /// <summary>
+        /// 判断是否为有效的块文件
+        /// </summary>
+        private bool IsValidBlockFile(string filePath)
+        {
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            return extension == ".dwg";
+        }
+
+        /// <summary>
+        /// 根据文件扩展名获取图标类型
+        /// </summary>
+        private string GetIconType(string extension)
+        {
+            return extension switch
+            {
+                ".dwg" => "dwg",
+                _ => "file"
+            };
+        }
+
+        /// <summary>
+        /// 检查IPC连接状态
+        /// </summary>
+        private async Task CheckIpcConnectionAsync()
+        {
+            try
+            {
+                StatusText = "正在检查CAD连接...";
+                
+                if (!_client.IsConnected)
+                {
+                    await _client.ConnectAsync();
+                }
+                
+                if (_client.IsConnected)
+                {
+                    ConnectionStatus = "已连接";
+                    ConnectionStatusColor = "#10B981"; // 绿色
+                    StatusText = "CAD连接正常，文件已加载";
+                }
+                else
+                {
+                    throw new Exception("无法建立连接");
+                }
+            }
+            catch (Exception ex)
+            {
+                ConnectionStatus = "未连接";
+                ConnectionStatusColor = "#EF4444"; // 红色
+                StatusText = $"CAD未连接: {ex.Message}";
             }
         }
 
@@ -205,7 +365,7 @@ namespace BlockManager.UI.ViewModels
                         // 最后一次尝试失败
                         StatusText = $"连接失败: {ex.Message}";
                         ConnectionStatus = "连接失败";
-                        ConnectionStatusColor = "Red";
+                        ConnectionStatusColor = "#EF4444";
                         
                         if (ex.Message.Contains("无法连接到CAD进程") || ex.Message.Contains("All pipe instances are busy"))
                         {
@@ -232,29 +392,25 @@ namespace BlockManager.UI.ViewModels
             try
             {
                 IsLoading = true;
-                StatusText = "正在连接到CAD进程...";
-
-                // 尝试连接到不同版本的AutoCAD
-                if (!_client.IsConnected)
+                
+                // 直接加载本地目录
+                await LoadLocalDirectoryAsync();
+                
+                // 尝试检查IPC连接状态
+                try
                 {
-                    await ConnectToAvailableServerAsync();
+                    await CheckIpcConnectionAsync();
                 }
-
-                // 更新连接状态
-                ConnectionStatus = "已连接";
-                ConnectionStatusColor = "Green";
-                
-                StatusText = "正在加载块库...";
-                var rootPath = @"c:\Users\PC\Desktop\BlockManager\Block";
-                
-                RootNode = await _client.GetBlockLibraryTreeAsync(rootPath);
-                StatusText = $"已加载块库 (节点数: {RootNode?.Children?.Count ?? 0})";
+                catch
+                {
+                    // IPC连接失败不影响文件加载，保持本地模式状态
+                }
             }
             catch (Exception)
             {
                 // 重置连接状态
-                ConnectionStatus = "未连接";
-                ConnectionStatusColor = "Red";
+                ConnectionStatus = "加载失败";
+                ConnectionStatusColor = "#EF4444";
                 RootNode = null;
                 
                 // 重新抛出异常，让重试机制处理
