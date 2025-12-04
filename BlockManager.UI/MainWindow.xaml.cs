@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Microsoft.Extensions.DependencyInjection;
 using BlockManager.IPC.DTOs;
 using BlockManager.UI.ViewModels;
 
@@ -18,6 +19,7 @@ namespace BlockManager.UI;
 /// </summary>
 public partial class MainWindow : Window
 {
+
     public MainWindow(MainWindowViewModel viewModel)
     {
         InitializeComponent();
@@ -88,4 +90,50 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    /// <summary>
+    /// 最小化按钮点击事件
+    /// </summary>
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    /// <summary>
+    /// 最大化/还原按钮点击事件
+    /// </summary>
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        // 简单的窗口状态切换，让系统处理所有细节
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    /// <summary>
+    /// 关闭按钮点击事件
+    /// </summary>
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    /// <summary>
+    /// 标题栏鼠标按下事件 - 处理拖动和双击
+    /// </summary>
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            if (e.ClickCount == 2)
+            {
+                // 双击 - 最大化/还原
+                MaximizeButton_Click(sender, new RoutedEventArgs());
+            }
+            else if (e.ClickCount == 1)
+            {
+                // 单击 - 拖动窗口
+                DragMove();
+            }
+        }
+    }
+
 }
