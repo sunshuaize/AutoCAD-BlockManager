@@ -3,9 +3,10 @@ using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using BlockManager.IPC.Contracts;
 using BlockManager.IPC.Client;
 using BlockManager.UI.ViewModels;
+using BlockManager.UI.Services;
+using BlockManager.IPC.Contracts;
 
 namespace BlockManager.UI
 {
@@ -15,6 +16,11 @@ namespace BlockManager.UI
     public partial class App : Application
     {
         private IHost? _host;
+
+        /// <summary>
+        /// 获取服务提供者
+        /// </summary>
+        public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("服务提供者未初始化");
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -50,9 +56,8 @@ namespace BlockManager.UI
             
             // 注册IPC客户端
             services.AddSingleton<IBlockManagerClient>(provider => new NamedPipeClient(pipeName));
-
-            // 注册ViewModels
-            services.AddTransient<MainWindowViewModel>();
+            services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<MainWindowViewModel>();
 
             // 注册Views
             services.AddTransient<MainWindow>();

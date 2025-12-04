@@ -350,7 +350,7 @@
                         </Button>
                         
                         <!-- 设置按钮 -->
-                        <Button Style="{StaticResource IconButtonStyle}" ToolTip="设置">
+                        <Button Style="{StaticResource IconButtonStyle}" ToolTip="设置" Click="SettingsButton_Click">
                             <Canvas Width="16" Height="16">
                                 <!-- 专业齿轮图标 - 使用Canvas确保精确定位 -->
                                 <Path Fill="Transparent" 

@@ -14,6 +14,8 @@ using BlockManager.UI.ViewModels;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
 using BlockManager.UI.Views;
+using BlockManager.UI.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BlockManager.UI;
 
@@ -184,6 +186,37 @@ public partial class MainWindow : Window
         };
         helpWindow.ShowDialog();
     }
+
+    /// <summary>
+    /// 设置按钮点击事件
+    /// </summary>
+    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settingsService = ((App)Application.Current).Services.GetRequiredService<ISettingsService>();
+            var settingsWindow = new SettingsWindow(settingsService)
+            {
+                Owner = this
+            };
+
+            if (settingsWindow.ShowDialog() == true)
+            {
+                // 设置已保存，重新加载数据
+                if (_viewModel.RefreshCommand.CanExecute(null))
+                {
+                    _viewModel.RefreshCommand.Execute(null);
+                }
+                
+                // 设置已保存，无需应用窗口设置
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"打开设置窗口失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
 
     /// <summary>
     /// 最小化按钮点击事件

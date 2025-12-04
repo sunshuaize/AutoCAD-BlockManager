@@ -1,11 +1,16 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using BlockManager.IPC.Contracts;
+using BlockManager.IPC.Client;
 using BlockManager.IPC.DTOs;
+using BlockManager.UI.Services;
+using BlockManager.UI.Models;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using BlockManager.IPC.Contracts;
 
 namespace BlockManager.UI.ViewModels
 {
@@ -15,6 +20,7 @@ namespace BlockManager.UI.ViewModels
     public class MainWindowViewModel : ViewModelBase
     {
         private readonly IBlockManagerClient _client;
+        private readonly ISettingsService _settingsService;
         private TreeNodeDto? _rootNode;
         private TreeNodeDto? _selectedNode;
         private PreviewDto? _currentPreview;
@@ -26,9 +32,10 @@ namespace BlockManager.UI.ViewModels
         private bool _showDefaultHint = true;
         private bool _showGrid = false;
 
-        public MainWindowViewModel(IBlockManagerClient client)
+        public MainWindowViewModel(IBlockManagerClient client, ISettingsService settingsService)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
+            _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
             
             
             // 初始化命令
@@ -255,13 +262,14 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         private async Task LoadLocalDirectoryAsync()
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
-                var rootPath = @"c:\Users\PC\Desktop\BlockManager\Block";
+                var settings = await _settingsService.LoadSettingsAsync();
+                var rootPath = settings.BlockLibraryPath;
                 
-                if (!Directory.Exists(rootPath))
+                if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath))
                 {
-                    throw new DirectoryNotFoundException($"目录不存在: {rootPath}");
+                    throw new DirectoryNotFoundException($"块库目录不存在: {rootPath}，请在设置中配置正确的路径");
                 }
 
                 StatusText = "正在扫描本地目录...";
