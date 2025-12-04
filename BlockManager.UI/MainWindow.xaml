@@ -9,7 +9,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="ProDesign Studio" 
-        Height="600" Width="900"
+        Height="750" Width="1120"
         MinHeight="400" MinWidth="600"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -27,6 +27,8 @@
         <converters:ModernIconConverter x:Key="ModernIconConverter"/>
         <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+        <converters:FileSizeConverter x:Key="FileSizeConverter"/>
+        <converters:CountToVisibilityConverter x:Key="CountToVisibilityConverter"/>
         
         <!-- Windsurf 风格 TreeView 样式 -->
         <Style x:Key="WindsurfTreeViewItemStyle" TargetType="TreeViewItem">
@@ -192,12 +194,21 @@
 
     </Window.Resources>
 
-    <!-- 主窗口容器 -->
-    <Border Background="{StaticResource SurfaceBrush}" 
-            CornerRadius="8"
-            BorderBrush="{StaticResource BorderBrush}"
-            BorderThickness="1">
-        <Grid>
+    <!-- 调整大小容器 -->
+    <Grid>
+        <!-- 调整大小边框 -->
+        <Border Name="ResizeBorder" 
+                Background="Transparent" 
+                BorderThickness="4" 
+                BorderBrush="Transparent"/>
+        
+        <!-- 主窗口容器 -->
+        <Border Background="{StaticResource SurfaceBrush}" 
+                CornerRadius="8"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                Margin="4">
+            <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>  <!-- 顶部标题栏 -->
                 <RowDefinition Height="*"/>   <!-- 主内容区域 -->
@@ -292,7 +303,7 @@
                     <!-- 功能按钮组 -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
                         <!-- 提示按钮 -->
-                        <Button Style="{StaticResource IconButtonStyle}" ToolTip="提示">
+                        <Button Style="{StaticResource IconButtonStyle}" ToolTip="使用说明" Click="HelpButton_Click">
                             <Grid Width="16" Height="16">
                                 <!-- 铃铛主体 -->
                                 <Path Fill="Transparent" 
@@ -539,36 +550,186 @@
                 </GridSplitter.Style>
             </GridSplitter>
             
-            <!-- 右侧：DWG文件网格展示 -->
+            <!-- 右侧：预览区域 -->
             <Border Grid.Column="2" 
                     Background="{StaticResource SearchBrush}">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled" 
-                              VerticalScrollBarVisibility="Auto"
-                              Padding="24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 图片预览区域 -->
+                    <Border Grid.Row="0" 
+                            Background="{StaticResource SearchBrush}"
+                            Margin="16"
+                            CornerRadius="12"
+                            BorderBrush="Transparent"
+                            BorderThickness="0"
+                            Visibility="{Binding CurrentPreview, Converter={StaticResource NullToVisibilityConverter}}">
+                        <Grid>
+                            <!-- PNG预览图片 -->
+                            <Border CornerRadius="8" 
+                                    Margin="24"
+                                    ClipToBounds="True"
+                                    Background="White"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
+                                    Visibility="{Binding CurrentPreview.PreviewImagePath, Converter={StaticResource NullToVisibilityConverter}}">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#000000" 
+                                                      Opacity="0.08" 
+                                                      BlurRadius="20" 
+                                                      ShadowDepth="8" 
+                                                      Direction="270"/>
+                                </Border.Effect>
+                                <Image Name="PreviewImage"
+                                       Source="{Binding CurrentPreview.PreviewImagePath}"
+                                       Stretch="Uniform"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Margin="16"/>
+                            </Border>
+                            
+                            <!-- 无预览图提示 -->
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding CurrentPreview.PreviewImagePath, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
+                                <ContentPresenter Content="{Binding Source=dwg, Converter={StaticResource ModernIconConverter}}"
+                                                  HorizontalAlignment="Center"
+                                                  Margin="0,0,0,16"/>
+                                <TextBlock Text="未找到PNG预览图"
+                                           FontSize="16"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding CurrentPreview.ErrorMessage}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextTertiaryBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 文件信息栏 -->
+                    <Border Grid.Row="1" 
+                            Background="White"
+                            Margin="16,8,16,16"
+                            CornerRadius="12"
+                            BorderBrush="Transparent"
+                            BorderThickness="0"
+                            Padding="20,16"
+                            Visibility="{Binding CurrentPreview, Converter={StaticResource NullToVisibilityConverter}}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" 
+                                              Opacity="0.06" 
+                                              BlurRadius="16" 
+                                              ShadowDepth="4" 
+                                              Direction="270"/>
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding CurrentPreview.FileName}"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding CurrentPreview.LastModified, StringFormat='修改时间: yyyy-MM-dd HH:mm:ss'}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1" 
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <Border Background="{StaticResource PrimaryBrush}"
+                                        CornerRadius="4"
+                                        Padding="8,4"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="DWG"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               Foreground="White"/>
+                                </Border>
+                                <TextBlock Text="{Binding CurrentPreview.FileSize, Converter={StaticResource FileSizeConverter}}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 默认空白提示 -->
+                    <StackPanel Grid.Row="0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding ShowDefaultHint, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ContentPresenter Content="{Binding Source=folder, Converter={StaticResource ModernIconConverter}}"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,24"/>
+                        <TextBlock Text="BlockManager 文件浏览器"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="选择文件夹查看DWG文件，点击DWG文件查看预览"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,12,0,0"/>
+                    </StackPanel>
+                    
+                    <!-- DWG文件网格（文件夹选择时显示） -->
+                    <ScrollViewer Grid.Row="0" 
+                                  Grid.RowSpan="2"
+                                  HorizontalScrollBarVisibility="Disabled" 
+                                  VerticalScrollBarVisibility="Auto"
+                                  Padding="24"
+                                  Visibility="{Binding ShowGrid, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <!-- DWG文件网格 -->
-                    <ItemsControl Name="DwgFilesGrid">
+                    <ItemsControl Name="DwgFilesGrid" 
+                                  ItemsSource="{Binding CurrentFolderFiles}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="4" />
+                                <WrapPanel Orientation="Horizontal" 
+                                           ItemWidth="200" 
+                                           ItemHeight="180"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{StaticResource SurfaceBrush}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Margin="12"
-                                        Cursor="Hand">
+                                <Border Background="White"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"
+                                        CornerRadius="12"
+                                        Margin="8"
+                                        Cursor="Hand"
+                                        MouseLeftButtonDown="DwgFile_Click">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#000000" 
+                                                          Opacity="0.06" 
+                                                          BlurRadius="16" 
+                                                          ShadowDepth="4" 
+                                                          Direction="270"/>
+                                    </Border.Effect>
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect Color="#3B82F6" Opacity="0.3" BlurRadius="8" ShadowDepth="0"/>
+                                                            <DropShadowEffect Color="#3B82F6" 
+                                                                              Opacity="0.15" 
+                                                                              BlurRadius="20" 
+                                                                              ShadowDepth="6" 
+                                                                              Direction="270"/>
                                                         </Setter.Value>
                                                     </Setter>
                                                 </Trigger>
@@ -584,10 +745,24 @@
                                         
                                         <!-- 缩略图区域 -->
                                         <Border Grid.Row="0" 
-                                                Background="{StaticResource HoverBrush}"
-                                                CornerRadius="6,6,0,0"
-                                                Margin="4,4,4,0">
+                                                Background="{StaticResource SearchBrush}"
+                                                CornerRadius="8,8,0,0"
+                                                Margin="8,8,8,0">
                                             <Grid>
+                                                <!-- PNG预览图片 -->
+                                                <Image Name="PreviewImage"
+                                                       Source="{Binding PreviewImagePath}"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8"/>
+                                                
+                                                <!-- DWG图标（当没有预览图时显示） -->
+                                                <ContentPresenter Content="{Binding IconType, Converter={StaticResource ModernIconConverter}}"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"
+                                                                  Visibility="{Binding PreviewImagePath, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                
                                                 <!-- DWG标识 -->
                                                 <Border Background="{StaticResource PrimaryBrush}"
                                                         CornerRadius="3"
@@ -600,45 +775,28 @@
                                                                FontWeight="Bold"
                                                                Foreground="White"/>
                                                 </Border>
-                                                
-                                                <!-- 文档图标 -->
-                                                <Path Width="32" Height="32"
-                                                      Fill="{StaticResource TextTertiaryBrush}"
-                                                      Stretch="Uniform"
-                                                      HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"
-                                                      Data="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                             </Grid>
                                         </Border>
                                         
                                         <!-- 文件信息 -->
-                                        <StackPanel Grid.Row="1" Margin="8">
-                                            <TextBlock Text="平面布置图_V3.dwg" 
-                                                       FontSize="13"
-                                                       FontWeight="Medium"
+                                        <StackPanel Grid.Row="1" Margin="12,8,12,12">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
                                                        Foreground="{StaticResource TextPrimaryBrush}"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="2023-10-24 14:30" 
-                                                       FontSize="11"
-                                                       Foreground="{StaticResource TextTertiaryBrush}"
-                                                       Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding FileInfo.LastModified, StringFormat='yyyy-MM-dd HH:mm'}" 
+                                                       FontSize="10"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
-                        
-                        <!-- 示例数据 -->
-                        <ItemsControl.Items>
-                            <Border/>
-                            <Border/>
-                            <Border/>
-                            <Border/>
-                            <Border/>
-                            <Border/>
-                        </ItemsControl.Items>
                     </ItemsControl>
                 </ScrollViewer>
+                </Grid>
             </Border>
         </Grid>
         
@@ -676,6 +834,7 @@
                 </Border>
             </Grid>
         </Border>
-        </Grid>
-    </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

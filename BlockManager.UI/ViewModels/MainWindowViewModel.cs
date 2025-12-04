@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,6 +22,9 @@ namespace BlockManager.UI.ViewModels
         private bool _isLoading;
         private string _connectionStatus = "未连接";
         private string _connectionStatusColor = "#EF4444";
+        private ObservableCollection<TreeNodeDto> _currentFolderFiles = new();
+        private bool _showDefaultHint = true;
+        private bool _showGrid = false;
 
         public MainWindowViewModel(IBlockManagerClient client)
         {
@@ -31,6 +35,7 @@ namespace BlockManager.UI.ViewModels
             LoadLibraryCommand = new AsyncRelayCommand(LoadLibraryAsync);
             FileDoubleClickCommand = new AsyncRelayCommand<TreeNodeDto>(HandleFileDoubleClickAsync);
             RefreshCommand = new AsyncRelayCommand(RefreshLibraryAsync);
+            SelectDwgFileCommand = new AsyncRelayCommand<TreeNodeDto>(SelectDwgFileAsync);
             
             // 订阅文件变化事件
             _client.FileChanged += OnFileChanged;
@@ -74,7 +79,30 @@ namespace BlockManager.UI.ViewModels
             {
                 if (SetProperty(ref _selectedNode, value))
                 {
-                    _ = LoadPreviewAsync(value);
+                    if (value?.Type == "folder")
+                    {
+                        // 选择文件夹时，显示网格
+                        UpdateCurrentFolderFiles();
+                        CurrentPreview = null;
+                        ShowDefaultHint = false;
+                        ShowGrid = true;
+                    }
+                    else if (value?.Type == "file" && value?.IconType == "dwg")
+                    {
+                        // 选择DWG文件时，直接显示PNG预览
+                        CurrentFolderFiles.Clear();
+                        ShowDefaultHint = false;
+                        ShowGrid = false;
+                        _ = LoadDwgPreviewAsync(value);
+                    }
+                    else
+                    {
+                        // 其他情况显示默认提示
+                        CurrentFolderFiles.Clear();
+                        CurrentPreview = null;
+                        ShowDefaultHint = true;
+                        ShowGrid = false;
+                    }
                 }
             }
         }
@@ -124,6 +152,33 @@ namespace BlockManager.UI.ViewModels
             set => SetProperty(ref _connectionStatusColor, value);
         }
 
+        /// <summary>
+        /// 当前文件夹中的DWG文件
+        /// </summary>
+        public ObservableCollection<TreeNodeDto> CurrentFolderFiles
+        {
+            get => _currentFolderFiles;
+            set => SetProperty(ref _currentFolderFiles, value);
+        }
+
+        /// <summary>
+        /// 是否显示默认提示
+        /// </summary>
+        public bool ShowDefaultHint
+        {
+            get => _showDefaultHint;
+            set => SetProperty(ref _showDefaultHint, value);
+        }
+
+        /// <summary>
+        /// 是否显示网格
+        /// </summary>
+        public bool ShowGrid
+        {
+            get => _showGrid;
+            set => SetProperty(ref _showGrid, value);
+        }
+
         #endregion
 
         #region 命令
@@ -142,6 +197,11 @@ namespace BlockManager.UI.ViewModels
         /// 刷新命令
         /// </summary>
         public ICommand RefreshCommand { get; }
+
+        /// <summary>
+        /// 选择DWG文件命令
+        /// </summary>
+        public ICommand SelectDwgFileCommand { get; }
 
         #endregion
 
@@ -559,6 +619,145 @@ namespace BlockManager.UI.ViewModels
 
             // 如果需要，可以在这里刷新文件树
             // await RefreshLibraryAsync();
+        }
+
+        /// <summary>
+        /// 更新当前文件夹文件列表
+        /// </summary>
+        private void UpdateCurrentFolderFiles()
+        {
+            CurrentFolderFiles.Clear();
+            
+            if (SelectedNode?.Type == "folder" && SelectedNode.Children != null)
+            {
+                var dwgFiles = SelectedNode.Children
+                    .Where(child => child.Type == "file" && child.IconType == "dwg")
+                    .ToList();
+
+                foreach (var file in dwgFiles)
+                {
+                    // 查找对应的PNG预览图
+                    var pngPath = Path.ChangeExtension(file.Path, ".png");
+                    if (File.Exists(pngPath))
+                    {
+                        file.PreviewImagePath = pngPath;
+                    }
+                    
+                    CurrentFolderFiles.Add(file);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 选择DWG文件
+        /// </summary>
+        private async Task SelectDwgFileAsync(TreeNodeDto? dwgFile)
+        {
+            if (dwgFile == null) return;
+
+            try
+            {
+                // 设置显示状态 - 隐藏网格，显示预览
+                ShowGrid = false;
+                ShowDefaultHint = false;
+                
+                // 查找对应的PNG预览图
+                var pngPath = Path.ChangeExtension(dwgFile.Path, ".png");
+                StatusText = $"查找PNG文件: {pngPath}";
+                
+                if (File.Exists(pngPath))
+                {
+                    // 创建预览数据
+                    var previewData = new PreviewDto
+                    {
+                        FileName = dwgFile.Name,
+                        FilePath = dwgFile.Path,
+                        PreviewImagePath = pngPath,
+                        FileSize = dwgFile.FileInfo?.Size ?? 0,
+                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
+                        IsSuccess = true
+                    };
+
+                    CurrentPreview = previewData;
+                    StatusText = $"已加载预览: {dwgFile.Name} -> {pngPath}";
+                }
+                else
+                {
+                    // 没有PNG预览图，创建基本信息
+                    var previewData = new PreviewDto
+                    {
+                        FileName = dwgFile.Name,
+                        FilePath = dwgFile.Path,
+                        PreviewImagePath = null,
+                        FileSize = dwgFile.FileInfo?.Size ?? 0,
+                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
+                        IsSuccess = false,
+                        ErrorMessage = "未找到对应的PNG预览图"
+                    };
+
+                    CurrentPreview = previewData;
+                    StatusText = $"未找到预览图: {dwgFile.Name}";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"加载预览失败: {ex.Message}";
+                CurrentPreview = null;
+            }
+        }
+
+        /// <summary>
+        /// 加载DWG文件预览
+        /// </summary>
+        private async Task LoadDwgPreviewAsync(TreeNodeDto dwgFile)
+        {
+            try
+            {
+                StatusText = $"正在加载预览: {dwgFile.Name}";
+                
+                // 查找对应的PNG预览图
+                var pngPath = Path.ChangeExtension(dwgFile.Path, ".png");
+                StatusText = $"查找PNG文件: {pngPath}";
+                
+                if (File.Exists(pngPath))
+                {
+                    // 创建预览数据
+                    var previewData = new PreviewDto
+                    {
+                        FileName = dwgFile.Name,
+                        FilePath = dwgFile.Path,
+                        PreviewImagePath = pngPath,
+                        FileSize = dwgFile.FileInfo?.Size ?? 0,
+                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
+                        IsSuccess = true
+                    };
+
+                    CurrentPreview = previewData;
+                    StatusText = $"已加载预览: {dwgFile.Name} -> {pngPath}";
+                }
+                else
+                {
+                    // 没有PNG预览图，创建基本信息
+                    var previewData = new PreviewDto
+                    {
+                        FileName = dwgFile.Name,
+                        FilePath = dwgFile.Path,
+                        PreviewImagePath = null,
+                        FileSize = dwgFile.FileInfo?.Size ?? 0,
+                        LastModified = dwgFile.FileInfo?.LastModified ?? DateTime.MinValue,
+                        IsSuccess = false,
+                        ErrorMessage = "未找到对应的PNG预览图"
+                    };
+
+                    CurrentPreview = previewData;
+                    StatusText = $"未找到预览图: {dwgFile.Name}";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"加载预览失败: {ex.Message}";
+                CurrentPreview = null;
+            }
         }
 
         /// <summary>

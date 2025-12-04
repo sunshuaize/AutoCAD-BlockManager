@@ -37,5 +37,10 @@ namespace BlockManager.IPC.DTOs
         /// 图标类型：folder、dwg、image、file
         /// </summary>
         public string IconType { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 预览图片路径（用于DWG文件的PNG预览）
+        /// </summary>
+        public string? PreviewImagePath { get; set; }
     }
 }

@@ -11,6 +11,9 @@ using System.Windows.Shapes;
 using Microsoft.Extensions.DependencyInjection;
 using BlockManager.IPC.DTOs;
 using BlockManager.UI.ViewModels;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using BlockManager.UI.Views;
 
 namespace BlockManager.UI;
 
@@ -19,14 +22,90 @@ namespace BlockManager.UI;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly MainWindowViewModel _viewModel;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
         InitializeComponent();
+        _viewModel = viewModel;
         DataContext = viewModel;
+        
+        // 添加窗体调整大小支持
+        this.SourceInitialized += MainWindow_SourceInitialized;
         
         // 移除Loaded事件，使用构造函数中的后台任务触发自动加载
         // Loaded += MainWindow_Loaded;
+    }
+
+    private void MainWindow_SourceInitialized(object sender, EventArgs e)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        HwndSource.FromHwnd(hwnd)?.AddHook(HwndHook);
+    }
+
+    private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_NCHITTEST = 0x0084;
+        const int HTCLIENT = 1;
+        const int HTCAPTION = 2;
+        const int HTLEFT = 10;
+        const int HTRIGHT = 11;
+        const int HTTOP = 12;
+        const int HTTOPLEFT = 13;
+        const int HTTOPRIGHT = 14;
+        const int HTBOTTOM = 15;
+        const int HTBOTTOMLEFT = 16;
+        const int HTBOTTOMRIGHT = 17;
+
+        if (msg == WM_NCHITTEST)
+        {
+            var point = PointFromScreen(new Point(lParam.ToInt32() & 0xFFFF, lParam.ToInt32() >> 16));
+            var resizeMargin = 8;
+
+            // 检查是否在调整大小区域
+            if (point.X <= resizeMargin && point.Y <= resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTTOPLEFT);
+            }
+            else if (point.X >= ActualWidth - resizeMargin && point.Y <= resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTTOPRIGHT);
+            }
+            else if (point.X <= resizeMargin && point.Y >= ActualHeight - resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTBOTTOMLEFT);
+            }
+            else if (point.X >= ActualWidth - resizeMargin && point.Y >= ActualHeight - resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTBOTTOMRIGHT);
+            }
+            else if (point.X <= resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTLEFT);
+            }
+            else if (point.X >= ActualWidth - resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTRIGHT);
+            }
+            else if (point.Y <= resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTTOP);
+            }
+            else if (point.Y >= ActualHeight - resizeMargin)
+            {
+                handled = true;
+                return new IntPtr(HTBOTTOM);
+            }
+        }
+
+        return IntPtr.Zero;
     }
     
     /// <summary>
@@ -80,15 +159,30 @@ public partial class MainWindow : Window
     /// </summary>
     private void TreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (DataContext is MainWindowViewModel viewModel && 
-            FileTreeView.SelectedItem is TreeNodeDto selectedNode)
+        if (sender is TreeView treeView && treeView.SelectedItem is TreeNodeDto selectedNode)
         {
-            // 执行双击命令
-            if (viewModel.FileDoubleClickCommand.CanExecute(selectedNode))
-            {
-                viewModel.FileDoubleClickCommand.Execute(selectedNode);
-            }
+            _viewModel.FileDoubleClickCommand?.Execute(selectedNode);
         }
+    }
+
+    private void DwgFile_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border border && border.DataContext is TreeNodeDto dwgFile)
+        {
+            _viewModel.SelectDwgFileCommand?.Execute(dwgFile);
+        }
+    }
+
+    /// <summary>
+    /// 提示按钮点击事件
+    /// </summary>
+    private void HelpButton_Click(object sender, RoutedEventArgs e)
+    {
+        var helpWindow = new HelpWindow
+        {
+            Owner = this
+        };
+        helpWindow.ShowDialog();
     }
 
     /// <summary>

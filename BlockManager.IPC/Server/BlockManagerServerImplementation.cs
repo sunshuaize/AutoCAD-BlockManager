@@ -170,8 +170,8 @@ namespace BlockManager.IPC.Server
                         }
                     }
 
-                    // 添加文件
-                    var files = Directory.GetFiles(path)
+                    // 添加文件（只显示DWG文件）
+                    var files = Directory.GetFiles(path, "*.dwg")
                         .OrderBy(f => Path.GetFileName(f))
                         .ToList();
 
