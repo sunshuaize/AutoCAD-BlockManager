@@ -323,7 +323,7 @@ public partial class MainWindow : Window
     {
         if (sender is TreeView treeView && treeView.SelectedItem is TreeNodeDto selectedNode)
         {
-            _viewModel.FileDoubleClickCommand?.Execute(selectedNode);
+            // 双击功能已移除
         }
     }
 
@@ -468,8 +468,18 @@ public partial class MainWindow : Window
             // 插入到CAD
             if (treeNode.Type == "file" && treeNode.IconType == "dwg")
             {
-                System.Diagnostics.Debug.WriteLine($"[UI] TreeView_Insert 调用 InsertToCadCommand.Execute");
-                _viewModel.InsertToCadCommand?.Execute(treeNode);
+                System.Diagnostics.Debug.WriteLine($"[UI] TreeView_Insert 开始插入DWG文件: {treeNode.Path}");
+                
+                // 调用ViewModel的插入块命令
+                var viewModel = DataContext as MainWindowViewModel;
+                if (viewModel?.InsertBlockCommand?.CanExecute(treeNode) == true)
+                {
+                    viewModel.InsertBlockCommand.Execute(treeNode);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[UI] ❌ TreeView_Insert 插入命令无法执行");
+                }
             }
             else
             {
@@ -572,10 +582,24 @@ public partial class MainWindow : Window
             border.DataContext is TreeNodeDto dwgFile)
         {
             System.Diagnostics.Debug.WriteLine($"[UI] Grid_InsertToCad 获取到文件: {dwgFile.Name}");
-            System.Diagnostics.Debug.WriteLine($"[UI] 调用 InsertToCadCommand.Execute");
+            System.Diagnostics.Debug.WriteLine($"[UI] 文件路径: {dwgFile.Path}");
             
-            // 调用ViewModel的插入CAD命令
-            _viewModel.InsertToCadCommand?.Execute(dwgFile);
+            // 调用ViewModel的插入块命令
+            var viewModel = DataContext as MainWindowViewModel;
+            System.Diagnostics.Debug.WriteLine($"[UI] ViewModel 是否为 null: {viewModel == null}");
+            System.Diagnostics.Debug.WriteLine($"[UI] InsertBlockCommand 是否为 null: {viewModel?.InsertBlockCommand == null}");
+            
+            bool canExecute = viewModel?.InsertBlockCommand?.CanExecute(dwgFile) == true;
+            System.Diagnostics.Debug.WriteLine($"[UI] CanExecute 结果: {canExecute}");
+            
+            if (canExecute)
+            {
+                viewModel.InsertBlockCommand.Execute(dwgFile);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[UI] ❌ Grid_InsertToCad 插入命令无法执行");
+            }
         }
         else
         {
@@ -595,7 +619,16 @@ public partial class MainWindow : Window
             // 双击插入到CAD
             if (selectedFile.Type == "file" && selectedFile.IconType == "dwg")
             {
-                _viewModel.InsertToCadCommand?.Execute(selectedFile);
+                // 调用ViewModel的插入块命令
+                var viewModel = DataContext as MainWindowViewModel;
+                if (viewModel?.InsertBlockCommand?.CanExecute(selectedFile) == true)
+                {
+                    viewModel.InsertBlockCommand.Execute(selectedFile);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[DEBUG] ❌ DwgFilesGrid双击 插入命令无法执行");
+                }
             }
         }
     }
@@ -666,6 +699,38 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    /// <summary>
+    /// 手动链接管道按钮点击事件
+    /// </summary>
+    private async void ConnectPipeButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[UI] 手动链接管道按钮被点击");
+            
+            // 尝试执行一个简单的CAD命令来测试连接
+            if (_viewModel.ExecuteCADCommandCommand?.CanExecute("PING") == true)
+            {
+                _viewModel.StatusText = "正在尝试连接到CAD...";
+                _viewModel.ExecuteCADCommandCommand.Execute("PING");
+            }
+            else
+            {
+                _viewModel.StatusText = "正在初始化连接...";
+                // 尝试刷新来重新建立连接
+                if (_viewModel.RefreshCommand?.CanExecute(null) == true)
+                {
+                    _viewModel.RefreshCommand.Execute(null);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _viewModel.StatusText = $"连接失败: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"[UI] 连接管道失败: {ex}");
+        }
     }
 
     /// <summary>

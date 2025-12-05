@@ -24,7 +24,7 @@ namespace BlockManager.Adapter._2024
             _cadCommandService = new Cad2024CADCommandService();
             
             // 初始化IPC服务
-            _ipcImplementation = new Cad2024IPCServerImplementation(_blockLibraryService);
+            _ipcImplementation = new Cad2024IPCServerImplementation(_blockLibraryService, _cadCommandService);
             _ipcServer = new NamedPipeServer(_ipcImplementation, "BlockManager_IPC");
         }
 
@@ -40,7 +40,14 @@ namespace BlockManager.Adapter._2024
                 {
                     await _ipcServer.StartAsync();
                     await Task.Delay(1000); // 等待服务器就绪
+                    ed?.WriteMessage("\n[BlockViewer] IPC服务器已启动，管道名称: BlockManager_IPC");
                 }
+                else
+                {
+                    ed?.WriteMessage("\n[BlockViewer] IPC服务器已在运行，管道名称: BlockManager_IPC");
+                }
+                
+               
 
                 // 启动WPF UI进程
                 var uiProcessPath = GetUIProcessPath();
@@ -69,8 +76,25 @@ namespace BlockManager.Adapter._2024
                 ed = Application.DocumentManager.MdiActiveDocument?.Editor;
                             }
         }
+        [CommandMethod("START")]
+        public async void StartPipeClient()
+        {
+            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
+            // 启动IPC服务器（如果尚未启动）
+            if (!_ipcServer.IsRunning)
+            {
+                await _ipcServer.StartAsync();
+                await Task.Delay(1000); // 等待服务器就绪
+                ed?.WriteMessage("\n[BlockViewer] IPC服务器已启动，管道名称: BlockManager_IPC");
+            }
+            else
+            {
+                ed?.WriteMessage("\n[BlockViewer] IPC服务器已在运行，管道名称: BlockManager_IPC");
+            }
 
+        }
 
+             
         /// <summary>
         /// 获取UI进程的路径
         /// </summary>
@@ -112,66 +136,7 @@ namespace BlockManager.Adapter._2024
             }
         }
 
-        [CommandMethod("BMTEST2024")]
-        public void TestLogging()
-        {
-            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            try
-            {
-                                                
-                // 测试IPC服务器状态
-                                
-                // 测试文件路径
-                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                                
-                var blockPath = Path.Combine(desktop, "BlockManager", "Block");
-                                                
-                // 测试UI路径
-                var uiPath = GetUIProcessPath();
-                                
-                // 测试IPC实现
-                                
-                // 测试日志文件
-                var logPath = @"c:\temp\blockmgr_test_2024.log";
-                try
-                {
-                    if (!Directory.Exists(@"c:\temp"))
-                    {
-                        Directory.CreateDirectory(@"c:\temp");
-                                            }
-                    
-                    File.WriteAllText(logPath, $"测试时间: {DateTime.Now}\n");
-                                    }
-                catch (Exception ex)
-                {
-                                    }
-                
-                                
-                // 异步启动IPC服务器（不等待）
-                if (!_ipcServer.IsRunning)
-                {
-                                        StartIpcServerAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                                            }
-        }
+        
 
-        /// <summary>
-        /// 异步启动IPC服务器（不阻塞UI线程）
-        /// </summary>
-        private async void StartIpcServerAsync()
-        {
-            try
-            {
-                var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                await _ipcServer.StartAsync();
-                            }
-            catch (Exception ex)
-            {
-                var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                            }
-        }
     }
 }

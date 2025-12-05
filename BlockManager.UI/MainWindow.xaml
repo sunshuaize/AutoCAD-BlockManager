@@ -384,6 +384,25 @@
                             </Grid>
                         </Button>
                         
+                        <!-- 命令控制器按钮 -->
+                        <Button Style="{StaticResource IconButtonStyle}" 
+                                ToolTip="CAD命令控制器" >
+                            <Grid Width="16" Height="16">
+                                <!-- 命令行图标 -->
+                                <Rectangle Width="14" Height="10" 
+                                          Stroke="{StaticResource TextSecondaryBrush}"
+                                          StrokeThickness="1.5"
+                                          Fill="Transparent"
+                                          RadiusX="2" RadiusY="2"/>
+                                <Line X1="3" Y1="6" X2="6" Y2="6"
+                                      Stroke="{StaticResource TextSecondaryBrush}"
+                                      StrokeThickness="1.5"/>
+                                <Line X1="8" Y1="8" X2="11" Y2="8"
+                                      Stroke="{StaticResource TextSecondaryBrush}"
+                                      StrokeThickness="1.5"/>
+                            </Grid>
+                        </Button>
+                        
                         <!-- 设置按钮 -->
                         <Button Style="{StaticResource IconButtonStyle}" ToolTip="设置" Click="SettingsButton_Click">
                             <Canvas Width="16" Height="16">
@@ -524,15 +543,16 @@
                                        Foreground="{StaticResource TextSecondaryBrush}"
                                        VerticalAlignment="Center"/>
                             
-                            <!-- 更多操作按钮 -->
+                            <!-- 手动链接管道按钮 -->
                             <Button Grid.Column="1"
                                     Width="20" Height="20"
                                     Padding="2"
-                                    ToolTip="更多操作">
+                                    ToolTip="手动链接管道"
+                                    Click="ConnectPipeButton_Click">
                                 <Path Width="12" Height="12" 
                                       Fill="{StaticResource TextTertiaryBrush}"
                                       Stretch="Uniform"
-                                      Data="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/>
+                                      Data="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71m-4.24 4.24l1.71-1.71a5 5 0 0 0 7.07 7.07l3-3a5 5 0 0 0-7.54-.54"/>
                                 
                                 <!-- 悬停时显示按钮 -->
                                 <Button.Style>

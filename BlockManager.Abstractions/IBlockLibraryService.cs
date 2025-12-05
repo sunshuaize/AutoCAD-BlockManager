@@ -12,12 +12,6 @@ namespace BlockManager.Abstractions
         /// </summary>
         void ShowBlockLibraryViewer();
 
-        /// <summary>
-        /// 插入DWG文件作为块
-        /// </summary>
-        /// <param name="dwgPath">DWG文件路径</param>
-        /// <param name="blockName">块名称</param>
-        void InsertDwgBlock(string dwgPath, string blockName);
 
         /// <summary>
         /// 检查文件是否存在
@@ -27,9 +21,12 @@ namespace BlockManager.Abstractions
         bool FileExists(string filePath);
 
         /// <summary>
-        /// 向用户显示消息
+        /// 插入DWG文件作为块到当前图纸
         /// </summary>
-        /// <param name="message">消息内容</param>
-        void ShowMessage(string message);
+        /// <param name="dwgFilePath">DWG文件路径</param>
+        /// <param name="blockName">块名称（可选，如果为空则使用文件名）</param>
+        /// <returns>插入是否成功</returns>
+        bool InsertDwgBlock(string dwgFilePath, string blockName = null);
+
     }
 }

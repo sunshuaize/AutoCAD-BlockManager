@@ -23,11 +23,12 @@ namespace BlockManager.IPC.Contracts
         Task<PreviewDto> GetFilePreviewAsync(string filePath);
 
         /// <summary>
-        /// 插入块到CAD
+        /// 执行命令
         /// </summary>
-        /// <param name="request">插入请求</param>
-        /// <returns>操作是否成功</returns>
-        Task<bool> InsertBlockAsync(InsertBlockRequest request);
+        /// <param name="request">命令执行请求</param>
+        /// <returns>命令执行响应</returns>
+        Task<CommandExecutionResponse> ExecuteCommandAsync(CommandExecutionRequest request);
+   
 
         /// <summary>
         /// 启动服务器

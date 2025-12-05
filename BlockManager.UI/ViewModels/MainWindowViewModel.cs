@@ -48,16 +48,16 @@ namespace BlockManager.UI.ViewModels
             
             // 初始化命令
             LoadLibraryCommand = new AsyncRelayCommand(LoadLibraryAsync);
-            FileDoubleClickCommand = new AsyncRelayCommand<TreeNodeDto>(HandleFileDoubleClickAsync);
             RefreshCommand = new AsyncRelayCommand(RefreshLibraryAsync);
             SelectDwgFileCommand = new AsyncRelayCommand<TreeNodeDto>(SelectDwgFileAsync);
-            InsertToCadCommand = new AsyncRelayCommand<TreeNodeDto>(InsertToCadAsync);
             SearchCommand = new RelayCommand<string>(ExecuteSearch);
             ClearSearchCommand = new RelayCommand(ClearSearch);
             ShowHistoryCommand = new AsyncRelayCommand(ShowHistoryAsync);
             HideHistoryCommand = new RelayCommand(HideHistory);
             HistoryItemClickCommand = new AsyncRelayCommand<HistoryItem>(OnHistoryItemClickAsync);
             ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
+            ExecuteCADCommandCommand = new AsyncRelayCommand<string>(ExecuteCADCommandAsync);
+            InsertBlockCommand = new AsyncRelayCommand<TreeNodeDto>(InsertBlockAsync);
             
             // 订阅文件变化事件
             _client.FileChanged += OnFileChanged;
@@ -290,10 +290,6 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         public ICommand LoadLibraryCommand { get; }
 
-        /// <summary>
-        /// 文件双击命令
-        /// </summary>
-        public ICommand FileDoubleClickCommand { get; }
 
         /// <summary>
         /// 刷新命令
@@ -305,10 +301,6 @@ namespace BlockManager.UI.ViewModels
         /// </summary>
         public ICommand SelectDwgFileCommand { get; }
 
-        /// <summary>
-        /// 插入到CAD命令
-        /// </summary>
-        public ICommand InsertToCadCommand { get; }
 
         /// <summary>
         /// 搜索命令
@@ -339,6 +331,17 @@ namespace BlockManager.UI.ViewModels
         /// 清空历史记录命令
         /// </summary>
         public AsyncRelayCommand ClearHistoryCommand { get; }
+
+        /// <summary>
+        /// 执行CAD命令
+        /// </summary>
+        public AsyncRelayCommand<string> ExecuteCADCommandCommand { get; }
+
+
+        /// <summary>
+        /// 插入块命令
+        /// </summary>
+        public AsyncRelayCommand<TreeNodeDto> InsertBlockCommand { get; }
 
         #endregion
 
@@ -708,41 +711,6 @@ namespace BlockManager.UI.ViewModels
             }
         }
 
-        /// <summary>
-        /// 处理文件双击
-        /// </summary>
-        /// <param name="node">节点</param>
-        private async Task HandleFileDoubleClickAsync(TreeNodeDto? node)
-        {
-            if (node?.Type != "file" || string.IsNullOrEmpty(node.Path))
-                return;
-
-            try
-            {
-                StatusText = $"正在插入块: {node.Name}";
-
-                var request = new InsertBlockRequest
-                {
-                    BlockPath = node.Path,
-                    BlockName = System.IO.Path.GetFileNameWithoutExtension(node.Name)
-                };
-
-                bool success = await _client.InsertBlockAsync(request);
-                
-                if (success)
-                {
-                    StatusText = $"已成功插入块: {node.Name}";
-                }
-                else
-                {
-                    StatusText = $"插入块失败: {node.Name}";
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusText = $"插入块时发生错误: {ex.Message}";
-            }
-        }
 
         /// <summary>
         /// 文件变化事件处理
@@ -929,227 +897,6 @@ namespace BlockManager.UI.ViewModels
             }
         }
 
-        /// <summary>
-        /// 插入到CAD
-        /// </summary>
-        private async Task InsertToCadAsync(TreeNodeDto? dwgFile)
-        {
-            System.Diagnostics.Debug.WriteLine($"[INSERT] InsertToCadAsync 被调用");
-            
-            if (dwgFile == null) 
-            {
-                System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ dwgFile 为 null");
-                StatusText = "错误: 未选择文件";
-                return;
-            }
-
-            System.Diagnostics.Debug.WriteLine($"[INSERT] 准备插入文件: {dwgFile.Name}, 路径: {dwgFile.Path}");
-
-            try
-            {
-                StatusText = $"正在插入到CAD: {dwgFile.Name}";
-                
-                // 检查文件是否存在
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 检查文件是否存在: {dwgFile.Path}");
-                if (!File.Exists(dwgFile.Path))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 文件不存在: {dwgFile.Path}");
-                    StatusText = $"错误: 文件不存在 - {dwgFile.Path}";
-                    return;
-                }
-                System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ 文件存在");
-                
-                // 检查DWG文件版本
-                try
-                {
-                    var fileInfo = new FileInfo(dwgFile.Path);
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件大小: {fileInfo.Length} bytes");
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件修改时间: {fileInfo.LastWriteTime}");
-                    
-                    // 尝试读取DWG文件头来判断版本
-                    using (var fs = new FileStream(dwgFile.Path, FileMode.Open, FileAccess.Read))
-                    {
-                        var buffer = new byte[6];
-                        fs.Read(buffer, 0, 6);
-                        var version = System.Text.Encoding.ASCII.GetString(buffer);
-                        System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件版本标识: {version}");
-                        
-                        // 常见的DWG版本标识
-                        var versionInfo = version switch
-                        {
-                            "AC1032" => "AutoCAD 2018-2024",
-                            "AC1027" => "AutoCAD 2013-2017", 
-                            "AC1024" => "AutoCAD 2010-2012",
-                            "AC1021" => "AutoCAD 2007-2009",
-                            "AC1018" => "AutoCAD 2004-2006",
-                            "AC1015" => "AutoCAD 2000-2002",
-                            "AC1014" => "AutoCAD R14",
-                            "AC1012" => "AutoCAD R13",
-                            _ => $"未知版本 ({version})"
-                        };
-                        System.Diagnostics.Debug.WriteLine($"[INSERT] DWG文件版本: {versionInfo}");
-                        
-                        // 如果是较新版本的文件，给出警告
-                        if (version == "AC1032" || version == "AC1027")
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[INSERT] ⚠️ 警告: 此DWG文件可能与旧版本CAD不兼容");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] 无法读取DWG文件版本信息: {ex.Message}");
-                }
-                
-                // 检查客户端连接状态
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 检查CAD连接状态: {_client.IsConnected}");
-                
-                // 尝试获取CAD版本信息（如果客户端支持的话）
-                try
-                {
-                    // 这里可以添加获取CAD版本的逻辑
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] CAD客户端类型: {_client.GetType().Name}");
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] 无法获取CAD版本信息: {ex.Message}");
-                }
-                
-                if (!_client.IsConnected)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] CAD未连接，尝试连接...");
-                    StatusText = "正在尝试连接CAD...";
-                    await _client.ConnectAsync();
-                    
-                    if (!_client.IsConnected)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ CAD连接失败");
-                        StatusText = "错误: 无法连接到CAD，请确保CAD已启动并加载了BlockManager插件";
-                        return;
-                    }
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ CAD连接成功");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ CAD已连接");
-                }
-                
-                // 发送插入命令到CAD
-                var insertRequest = new InsertBlockRequest
-                {
-                    BlockPath = dwgFile.Path,
-                    BlockName = Path.GetFileNameWithoutExtension(dwgFile.Name)
-                };
-
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 创建插入请求 - 路径: {insertRequest.BlockPath}, 块名: {insertRequest.BlockName}");
-                StatusText = $"正在发送插入命令...";
-                
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 调用 _client.InsertBlockAsync...");
-                var startTime = DateTime.Now;
-                
-                // 在插入前再次确认连接状态
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入前最终连接检查: {_client.IsConnected}");
-                
-                var result = await _client.InsertBlockAsync(insertRequest);
-                var endTime = DateTime.Now;
-                var duration = endTime - startTime;
-                System.Diagnostics.Debug.WriteLine($"[INSERT] InsertBlockAsync 返回结果: {result}");
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入操作耗时: {duration.TotalMilliseconds}ms");
-                
-                // 如果耗时很短（<100ms），可能表示CAD没有真正处理请求
-                if (duration.TotalMilliseconds < 100)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ⚠️ 警告: 插入操作耗时过短，可能CAD未正确处理");
-                }
-                
-                // 插入后再次检查连接状态
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 插入后连接状态: {_client.IsConnected}");
-                
-                if (result)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ✅ 插入成功");
-                    StatusText = $"✅ 已成功插入到CAD: {dwgFile.Name}";
-                    
-                    // 添加到历史记录
-                    System.Diagnostics.Debug.WriteLine($"[HISTORY] 开始添加历史记录: {dwgFile.Name}, 路径: {dwgFile.Path}");
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 调用 AddOrUpdateHistoryAsync...");
-                            await _historyService.AddOrUpdateHistoryAsync(dwgFile.Path);
-                            System.Diagnostics.Debug.WriteLine($"[HISTORY] ✅ 成功添加到历史记录: {dwgFile.Name}");
-                            
-                            // 验证是否真的添加了
-                            var historyItems = await _historyService.GetHistoryItemsAsync(5);
-                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 当前历史记录数量: {historyItems.Count}");
-                            foreach (var item in historyItems.Take(3))
-                            {
-                                System.Diagnostics.Debug.WriteLine($"[HISTORY] - {item.FileName} ({item.LastAccessTime:HH:mm:ss})");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[HISTORY] ❌ 添加历史记录失败: {ex.Message}");
-                            System.Diagnostics.Debug.WriteLine($"[HISTORY] 异常详情: {ex}");
-                        }
-                    });
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 插入失败 - CAD返回false");
-                    
-                    // 根据可能的原因提供详细的错误信息
-                    var errorMessage = $"❌ 插入失败: {dwgFile.Name}";
-                    var suggestions = new List<string>();
-                    
-                    // 常见问题的诊断和建议
-                    suggestions.Add("尝试重新启动CAD并重新加载BlockManager插件");
-                    suggestions.Add("检查CAD是否有活动的命令或正在编辑状态");
-                    suggestions.Add("确认CAD文档已打开且可编辑");
-                    
-                    // 检查插入耗时，如果太短可能是通信问题
-                    if (duration.TotalMilliseconds < 100)
-                    {
-                        suggestions.Insert(0, "CAD通信异常，建议重新连接");
-                    }
-                    
-                    // 检查是否可能是版本兼容性问题（但优先级较低，因为之前能用）
-                    try
-                    {
-                        using (var fs = new FileStream(dwgFile.Path, FileMode.Open, FileAccess.Read))
-                        {
-                            var buffer = new byte[6];
-                            fs.Read(buffer, 0, 6);
-                            var version = System.Text.Encoding.ASCII.GetString(buffer);
-                            
-                            if (version == "AC1032" || version == "AC1027")
-                            {
-                                suggestions.Add("检查DWG文件版本兼容性");
-                            }
-                        }
-                    }
-                    catch { }
-                    
-                    errorMessage += $" - {suggestions[0]}"; // 只显示第一个最重要的建议
-                    System.Diagnostics.Debug.WriteLine($"[INSERT] 建议解决方案:");
-                    for (int i = 0; i < suggestions.Count; i++)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[INSERT] {i + 1}. {suggestions[i]}");
-                    }
-                    
-                    StatusText = errorMessage;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[INSERT] ❌ 插入异常: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[INSERT] 异常详情: {ex}");
-                StatusText = $"❌ 插入到CAD失败: {ex.Message}";
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"[INSERT] InsertToCadAsync 执行完成");
-        }
 
         /// <summary>
         /// 加载DWG文件预览
@@ -1489,6 +1236,100 @@ namespace BlockManager.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// 执行CAD命令
+        /// </summary>
+        /// <param name="command">要执行的命令</param>
+        private async Task ExecuteCADCommandAsync(string? command)
+        {
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                StatusText = "错误: 命令不能为空";
+                return;
+            }
+
+            try
+            {
+                StatusText = $"正在执行命令: {command}";
+                
+                // 检查连接状态
+                if (!_client.IsConnected)
+                {
+                    StatusText = "错误: 未连接到CAD进程";
+                    return;
+                }
+
+                // 执行命令
+                var response = await _client.ExecuteCommandAsync(command);
+                
+                if (response.IsSuccess)
+                {
+                    StatusText = $"命令执行成功: {command} (耗时: {response.ExecutionTimeMs}ms)";
+                }
+                else
+                {
+                    StatusText = $"命令执行失败: {response.ErrorMessage}";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"执行命令时发生错误: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 插入块到CAD
+        /// </summary>
+        /// <param name="node">要插入的文件节点</param>
+       private async Task InsertBlockAsync(TreeNodeDto node)
+{
+    if (node == null)
+    {
+        System.Diagnostics.Debug.WriteLine($"[UI] InsertBlockAsync: node 为 null");
+        return;
+    }
+
+    System.Diagnostics.Debug.WriteLine($"[UI] InsertBlockAsync 开始执行，文件: {node.Name}");
+
+    IsLoading = true;
+    StatusText = "正在插入块...";
+
+    try
+    {
+        // 构建插入块的命令
+        string blockName = Path.GetFileNameWithoutExtension(node.Name);
+        // 修改命令格式为：INSERT_BLOCK "文件路径" "块名"
+        string insertCommand = $"INSERT_BLOCK \"{node.Path}\" \"{blockName}\"";
+        
+        System.Diagnostics.Debug.WriteLine($"[UI] 发送命令: {insertCommand}");
+        
+        // 执行插入块命令
+        var response = await _client.ExecuteCommandAsync(insertCommand);
+        
+        if (response.IsSuccess)
+        {
+            StatusText = "块插入命令已发送";
+            await _historyService.AddOrUpdateHistoryAsync(node.Path);
+        }
+        else
+        {
+            StatusText = $"插入块失败: {response.ErrorMessage}";
+            System.Diagnostics.Debug.WriteLine($"[UI] 插入块失败: {response.ErrorMessage}");
+        }
+    }
+    catch (Exception ex)
+    {
+        StatusText = $"插入块时出错: {ex.Message}";
+        System.Diagnostics.Debug.WriteLine($"[UI] 插入块异常: {ex}");
+    }
+    finally
+    {
+        IsLoading = false;
+        System.Diagnostics.Debug.WriteLine($"[UI] InsertBlockAsync 执行完成");
+    }
+}
+
+   
         #endregion
     }
 }

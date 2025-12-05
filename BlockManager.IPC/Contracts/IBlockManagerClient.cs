@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using BlockManager.IPC.DTOs;
 
@@ -24,12 +25,13 @@ namespace BlockManager.IPC.Contracts
         Task<PreviewDto> GetFilePreviewAsync(string filePath);
 
         /// <summary>
-        /// 插入块到CAD
+        /// 执行命令
         /// </summary>
-        /// <param name="request">插入请求</param>
-        /// <returns>操作是否成功</returns>
-        Task<bool> InsertBlockAsync(InsertBlockRequest request);
-
+        /// <param name="command">要执行的命令</param>
+        /// <param name="parameters">命令参数（可选）</param>
+        /// <returns>命令执行响应</returns>
+        Task<CommandExecutionResponse> ExecuteCommandAsync(string command, Dictionary<string, object>? parameters = null);
+   
         /// <summary>
         /// 文件变化事件
         /// </summary>

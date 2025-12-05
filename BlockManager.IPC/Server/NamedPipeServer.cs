@@ -167,13 +167,23 @@ namespace BlockManager.IPC.Server
                     return CreateErrorResponse("", "INVALID_REQUEST", "无效的请求格式");
                 }
 
-                return request.Action switch
+                // 使用if-else替代switch表达式，兼容C# 7.3
+                if (request.Action == "GET_BLOCK_LIBRARY_TREE")
                 {
-                    "GET_BLOCK_LIBRARY_TREE" => await HandleGetBlockLibraryTreeAsync(request),
-                    "GET_FILE_PREVIEW" => await HandleGetFilePreviewAsync(request),
-                    "INSERT_BLOCK" => await HandleInsertBlockAsync(request),
-                    _ => CreateErrorResponse(request.MessageId, "UNKNOWN_ACTION", $"未知的操作: {request.Action}")
-                };
+                    return await HandleGetBlockLibraryTreeAsync(request);
+                }
+                else if (request.Action == "GET_FILE_PREVIEW")
+                {
+                    return await HandleGetFilePreviewAsync(request);
+                }
+                else if (request.Action == "EXECUTE_COMMAND")
+                {
+                    return await HandleExecuteCommandAsync(request);
+                }
+                else
+                {
+                    return CreateErrorResponse(request.MessageId, "UNKNOWN_ACTION", $"未知的操作: {request.Action}");
+                }
             }
             catch (Exception ex)
             {
@@ -227,13 +237,19 @@ namespace BlockManager.IPC.Server
             }
         }
 
-        private async Task<ResponseMessage> HandleInsertBlockAsync(RequestMessage request)
+        private async Task<ResponseMessage> HandleExecuteCommandAsync(RequestMessage request)
         {
             try
             {
-                var insertRequest = JsonConvert.DeserializeObject<InsertBlockRequest>(JsonConvert.SerializeObject(request.Data));
+                var dataJson = JsonConvert.SerializeObject(request.Data);
+                var commandRequest = JsonConvert.DeserializeObject<CommandExecutionRequest>(dataJson);
                 
-                var result = await _implementation.InsertBlockAsync(insertRequest!);
+                if (commandRequest == null)
+                {
+                    return CreateErrorResponse(request.MessageId, "INVALID_COMMAND_REQUEST", "无效的命令请求格式");
+                }
+                
+                var result = await _implementation.ExecuteCommandAsync(commandRequest);
                 
                 return new ResponseMessage
                 {
@@ -244,9 +260,11 @@ namespace BlockManager.IPC.Server
             }
             catch (Exception ex)
             {
-                return CreateErrorResponse(request.MessageId, "INSERT_BLOCK_ERROR", ex.Message);
+                return CreateErrorResponse(request.MessageId, "EXECUTE_COMMAND_ERROR", ex.Message);
             }
         }
+
+    
 
         private static ResponseMessage CreateErrorResponse(string messageId, string errorCode, string errorMessage)
         {
@@ -278,7 +296,7 @@ namespace BlockManager.IPC.Server
         // 这些方法委托给实际的实现
         public Task<TreeNodeDto> GetBlockLibraryTreeAsync(string rootPath) => _implementation.GetBlockLibraryTreeAsync(rootPath);
         public Task<PreviewDto> GetFilePreviewAsync(string filePath) => _implementation.GetFilePreviewAsync(filePath);
-        public Task<bool> InsertBlockAsync(InsertBlockRequest request) => _implementation.InsertBlockAsync(request);
+        public Task<CommandExecutionResponse> ExecuteCommandAsync(CommandExecutionRequest request) => _implementation.ExecuteCommandAsync(request);
 
         /// <summary>
         /// 输出日志

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -8,19 +9,21 @@ using BlockManager.Abstractions;
 namespace BlockManager.Adapter._2010
 {
     /// <summary>
-    /// 简化的IPC服务器，兼容.NET Framework 3.5
+    /// AutoCAD 2010 IPC服务端实现，兼容.NET Framework 3.5
     /// </summary>
-    public class SimpleIPCServer : IDisposable
+    public class Cad2010IPCServerImplementation : IDisposable
     {
         private readonly string _pipeName;
         private readonly IBlockLibraryService _blockLibraryService;
+        private readonly ICADCommandService _cadCommandService;
         private Thread _serverThread;
         private volatile bool _isRunning;
         private volatile bool _disposed;
 
-        public SimpleIPCServer(IBlockLibraryService blockLibraryService, string pipeName = "BlockManager_IPC")
+        public Cad2010IPCServerImplementation(IBlockLibraryService blockLibraryService, ICADCommandService cadCommandService, string pipeName = "BlockManager_IPC")
         {
             _blockLibraryService = blockLibraryService ?? throw new ArgumentNullException("blockLibraryService");
+            _cadCommandService = cadCommandService ?? throw new ArgumentNullException("cadCommandService");
             _pipeName = pipeName;
         }
 
@@ -32,7 +35,7 @@ namespace BlockManager.Adapter._2010
         public void Start()
         {
             if (_disposed)
-                throw new ObjectDisposedException("SimpleIPCServer");
+                throw new ObjectDisposedException("Cad2010IPCServerImplementation");
 
             if (_isRunning)
             {
@@ -40,11 +43,11 @@ namespace BlockManager.Adapter._2010
                 return;
             }
 
-            LogDebug("开始启动IPC服务器...");
+            LogDebug("[2010 IPC] 开始启动IPC服务器...");
             _isRunning = true;
             _serverThread = new Thread(RunServer) { IsBackground = true };
             _serverThread.Start();
-            LogDebug("IPC服务器线程已启动");
+            LogDebug("[2010 IPC] IPC服务器线程已启动");
         }
 
         public void Stop()
@@ -52,7 +55,7 @@ namespace BlockManager.Adapter._2010
             if (!_isRunning)
                 return;
 
-            LogDebug("正在停止IPC服务器...");
+            LogDebug("[2010 IPC] 正在停止IPC服务器...");
             _isRunning = false;
 
             if (_serverThread != null && _serverThread.IsAlive)
@@ -60,12 +63,12 @@ namespace BlockManager.Adapter._2010
                 _serverThread.Join(2000); // 等待2秒让服务器线程正常退出
             }
             
-            LogDebug("IPC服务器已停止");
+            LogDebug("[2010 IPC] IPC服务器已停止");
         }
 
         private void RunServer()
         {
-            LogDebug("IPC服务器线程启动");
+            LogDebug("[2010 IPC] IPC服务器线程启动");
             
             while (_isRunning)
             {
@@ -74,20 +77,20 @@ namespace BlockManager.Adapter._2010
                 {
                     pipeServer = new NamedPipeServerStream(_pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte);
                     
-                    LogDebug("IPC服务器正在等待连接... (管道名: " + _pipeName + ")");
+                    LogDebug("[2010 IPC] IPC服务器正在等待连接... (管道名: " + _pipeName + ")");
                     
                     // 等待客户端连接
                     pipeServer.WaitForConnection();
                     
-                    LogDebug("客户端已连接到IPC服务器");
+                    LogDebug("[2010 IPC] 客户端已连接到IPC服务器");
                     
                     // 处理客户端请求
                     HandleClient(pipeServer);
                 }
                 catch (Exception ex)
                 {
-                    LogDebug("IPC服务器错误: " + ex.Message);
-                    LogDebug("错误详情: " + ex.ToString());
+                    LogDebug("[2010 IPC] IPC服务器错误: " + ex.Message);
+                    LogDebug("[2010 IPC] 错误详情: " + ex.ToString());
                 }
                 finally
                 {
@@ -106,7 +109,7 @@ namespace BlockManager.Adapter._2010
                     }
                     catch (Exception ex)
                     {
-                        LogDebug("关闭管道时出错: " + ex.Message);
+                        LogDebug("[2010 IPC] 关闭管道时出错: " + ex.Message);
                     }
                     
                     // 短暂等待后重试
@@ -131,7 +134,7 @@ namespace BlockManager.Adapter._2010
                     ReadExact(pipeServer, lengthBytes, 4);
                     var requestLength = BitConverter.ToInt32(lengthBytes, 0);
 
-                    LogDebug($"[2010 IPC] 收到请求，长度: {requestLength}");
+                    LogDebug("[2010 IPC] 收到请求，长度: " + requestLength);
 
                     // 读取请求数据
                     var requestBytes = new byte[requestLength];
@@ -139,10 +142,10 @@ namespace BlockManager.Adapter._2010
 
                     // 处理请求
                     var requestJson = Encoding.UTF8.GetString(requestBytes);
-                    LogDebug($"[2010 IPC] 请求内容: {requestJson}");
+                    LogDebug("[2010 IPC] 请求内容: " + requestJson);
                     
                     var response = ProcessRequest(requestJson);
-                    LogDebug($"[2010 IPC] 响应内容: {response}");
+                    LogDebug("[2010 IPC] 响应内容: " + response);
 
                     // 发送响应
                     var responseBytes = Encoding.UTF8.GetBytes(response);
@@ -152,11 +155,11 @@ namespace BlockManager.Adapter._2010
                     pipeServer.Write(responseBytes, 0, responseBytes.Length);
                     pipeServer.Flush();
                     
-                    LogDebug($"[2010 IPC] 响应已发送，长度: {responseBytes.Length}");
+                    LogDebug("[2010 IPC] 响应已发送，长度: " + responseBytes.Length);
                 }
                 catch (Exception ex)
                 {
-                    LogDebug($"[2010 IPC] 处理客户端请求时出错: {ex.Message}");
+                    LogDebug("[2010 IPC] 处理客户端请求时出错: " + ex.Message);
                     break;
                 }
             }
@@ -168,23 +171,74 @@ namespace BlockManager.Adapter._2010
         {
             try
             {
-                // 简单的JSON解析 - 查找action字段
+                LogDebug("[2010 IPC] ===== 收到新请求 =====");
+                LogDebug("[2010 IPC] 请求JSON: " + requestJson);
+                
                 var action = ExtractJsonValue(requestJson, "Action");
                 
-                switch (action)
+                if (string.IsNullOrEmpty(action))
                 {
-                    case "GET_BLOCK_LIBRARY_TREE":
-                        return HandleGetBlockLibraryTree(requestJson);
-                    case "GET_FILE_PREVIEW":
-                        return HandleGetFilePreview(requestJson);
-                    case "INSERT_BLOCK":
-                        return HandleInsertBlock(requestJson);
-                    default:
-                        return CreateErrorResponse("UNKNOWN_ACTION", "未知的操作: " + action);
+                    LogDebug("[2010 IPC] 错误: 请求中缺少Action字段");
+                    return CreateErrorResponse("INVALID_REQUEST", "请求中缺少Action字段");
                 }
+                
+                LogDebug($"[2010 IPC] 处理操作: {action}");
+                
+                string result;
+                try
+                {
+                    // 使用if-else替代switch表达式，兼容C# 7.3
+                    if (action == "GET_BLOCK_LIBRARY_TREE")
+                    {
+                        result = HandleGetBlockLibraryTree(requestJson);
+                    }
+                    else if (action == "GET_FILE_PREVIEW")
+                    {
+                        result = HandleGetFilePreview(requestJson);
+                    }
+                    else if (action == "EXECUTE_COMMAND")
+                    {
+                        result = HandleExecuteCommand(requestJson);
+                    }
+                    else
+                    {
+                        result = CreateErrorResponse("UNKNOWN_ACTION", "未知的操作: " + action);
+                    }
+                    
+                    LogDebug($"[2010 IPC] 操作 {action} 处理完成");
+                }
+                catch (Exception actionEx)
+                {
+                    LogDebug($"[2010 IPC] 处理操作 {action} 时出错: {actionEx.Message}");
+                    if (actionEx.InnerException != null)
+                    {
+                        LogDebug($"[2010 IPC] 内部异常: {actionEx.InnerException.Message}");
+                    }
+                    
+                    // 捕获并记录异常堆栈
+                    LogDebug($"[2010 IPC] 异常堆栈: {actionEx.StackTrace}");
+                    
+                    result = CreateErrorResponse("ACTION_ERROR", $"处理 {action} 操作时出错: {actionEx.Message}");
+                }
+                
+                return result;
             }
             catch (Exception ex)
             {
+                try
+                {
+                    LogDebug("[2010 IPC] 处理请求时发生严重错误: " + ex.Message);
+                    if (ex.InnerException != null)
+                    {
+                        LogDebug("[2010 IPC] 内部异常: " + ex.InnerException.Message);
+                    }
+                    LogDebug("[2010 IPC] 异常堆栈: " + ex.StackTrace);
+                }
+                catch
+                {
+                    // 忽略日志错误
+                }
+                
                 return CreateErrorResponse("PROCESSING_ERROR", "处理请求时出错: " + ex.Message);
             }
         }
@@ -206,6 +260,8 @@ namespace BlockManager.Adapter._2010
             }
         }
 
+    
+        
         private string HandleGetFilePreview(string requestJson)
         {
             try
@@ -255,27 +311,90 @@ namespace BlockManager.Adapter._2010
             }
         }
 
-        private string HandleInsertBlock(string requestJson)
+        private string HandleExecuteCommand(string requestJson)
         {
+            var stopwatch = Stopwatch.StartNew();
+            
             try
             {
-                LogDebug("[2010 IPC] 收到插入块请求");
+                LogDebug("[2010 IPC] ===== 收到ExecuteCommand请求 =====");
+                LogDebug("[2010 IPC] 请求JSON: " + requestJson);
                 
-                var blockPath = ExtractJsonValue(requestJson, "BlockPath");
-                var blockName = ExtractJsonValue(requestJson, "BlockName");
+                // 从请求中提取命令
+                var command = ExtractJsonValue(requestJson, "Command");
                 
-                LogDebug($"[2010 IPC] 解析请求 - 路径: {blockPath}, 块名: {blockName}");
+                if (string.IsNullOrEmpty(command))
+                {
+                    LogDebug("[2010 IPC] 错误: 命令为空");
+                    return CreateErrorResponse("INVALID_COMMAND", "命令不能为空");
+                }
                 
-                _blockLibraryService.InsertDwgBlock(blockPath, blockName);
+                LogDebug("[2010 IPC] 提取的命令: [" + command + "]");
+                LogDebug("[2010 IPC] 命令长度: " + command.Length);
                 
-                LogDebug("[2010 IPC] 插入命令已发送到CAD");
+                // 检查CAD服务
+                if (_cadCommandService == null)
+                {
+                    LogDebug("[2010 IPC] 错误: CAD命令服务为空");
+                    return CreateErrorResponse("SERVICE_ERROR", "CAD命令服务不可用");
+                }
                 
-                return "{\"IsSuccess\":true,\"Data\":true}";
+                // 尝试获取当前文档
+                var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+                if (doc == null)
+                {
+                    LogDebug("[2010 IPC] 错误: 无法获取当前活动文档");
+                }
+                else
+                {
+                    LogDebug("[2010 IPC] 当前文档: " + doc.Name);
+                }
+                
+                // 执行CAD命令
+                LogDebug("[2010 IPC] 开始执行CAD命令...");
+                try
+                {
+                    _cadCommandService.ExecuteCommand(command);
+                    LogDebug("[2010 IPC] CAD命令执行完成");
+                }
+                catch (Exception cmdEx)
+                {
+                    LogDebug("[2010 IPC] 执行命令时出错: " + cmdEx.Message);
+                    if (cmdEx.InnerException != null)
+                    {
+                        LogDebug("[2010 IPC] 内部异常: " + cmdEx.InnerException.Message);
+                    }
+                    throw; // 重新抛出异常以便返回错误响应
+                }
+                
+                stopwatch.Stop();
+                
+                // 构建成功响应JSON
+                var responseJson = string.Format(
+                    "{{\"IsSuccess\":true,\"Data\":{{\"IsSuccess\":true,\"Result\":\"命令 '{0}' 执行完成\",\"ExecutedAt\":\"{1}\",\"ExecutionTimeMs\":{2}}}}}",
+                    EscapeJsonString(command),
+                    DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    stopwatch.ElapsedMilliseconds
+                );
+                
+                LogDebug("[2010 IPC] 命令执行成功，耗时: " + stopwatch.ElapsedMilliseconds + "ms");
+                return responseJson;
             }
             catch (Exception ex)
             {
-                LogDebug($"[2010 IPC] 插入块时发生错误: {ex.Message}");
-                return CreateErrorResponse("INSERT_BLOCK_ERROR", ex.Message);
+                stopwatch.Stop();
+                
+                LogDebug("[2010 IPC] 命令执行失败: " + ex.Message);
+                
+                // 构建错误响应JSON
+                var errorResponseJson = string.Format(
+                    "{{\"IsSuccess\":true,\"Data\":{{\"IsSuccess\":false,\"ErrorMessage\":\"{0}\",\"ExecutedAt\":\"{1}\",\"ExecutionTimeMs\":{2}}}}}",
+                    EscapeJsonString(ex.Message),
+                    DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    stopwatch.ElapsedMilliseconds
+                );
+                
+                return errorResponseJson;
             }
         }
 
@@ -389,7 +508,7 @@ namespace BlockManager.Adapter._2010
         {
             try
             {
-                var logMessage = DateTime.Now.ToString("HH:mm:ss.fff") + " [IPC] " + message;
+                var logMessage = DateTime.Now.ToString("HH:mm:ss.fff") + " " + message;
                 
                 // 输出到控制台
                 Console.WriteLine(logMessage);

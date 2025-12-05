@@ -1,4 +1,7 @@
 using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using BlockManager.Abstractions;
 using System;
@@ -12,7 +15,7 @@ namespace BlockManager.Adapter._2010
     {
         private static IBlockLibraryService _blockLibraryService;
         private static ICADCommandService _cadCommandService;
-        private static SimpleIPCServer _ipcServer;
+        private static Cad2010IPCServerImplementation _ipcServer;
 
         static BlockInsertCommands()
         {
@@ -20,8 +23,8 @@ namespace BlockManager.Adapter._2010
             _blockLibraryService = new Cad2010BlockLibraryService();
             _cadCommandService = new Cad2010CADCommandService();
 
-            // 初始化简化的IPC服务器
-            _ipcServer = new SimpleIPCServer(_blockLibraryService, "BlockManager_IPC");
+            // 初始化IPC服务器
+            _ipcServer = new Cad2010IPCServerImplementation(_blockLibraryService, _cadCommandService, "BlockManager_IPC");
         }
 
         [CommandMethod("BLOCKVIEWER")]
@@ -68,6 +71,60 @@ namespace BlockManager.Adapter._2010
             }
         }
 
+        [CommandMethod("ExecuteCommand")]
+        public void ExecuteCommand()
+        {
+            // 获取当前活动文档
+            Document acDoc = Application.DocumentManager.MdiActiveDocument;
+            if (acDoc == null)
+            {
+                return;
+            }
+
+            Editor acEd = acDoc.Editor;
+            string blockFilePath = @"C:\Users\PC\Desktop\Block\围护结构\700x900支撑配筋断面.dwg";
+
+            try
+            {
+                // 验证文件是否存在
+                if (!File.Exists(blockFilePath))
+                {
+                    acEd.WriteMessage($"\n错误: 找不到指定的DWG文件: {blockFilePath}");
+                    return;
+                }
+
+                // 构建INSERT命令字符串
+                // 使用引号包围文件路径以处理包含空格和中文字符的路径
+                string baseCommand = $"-INSERT \"{blockFilePath}\"";
+                
+                // 添加多个换行符来确保命令自动执行
+                // 这模拟了用户输入命令后按回车的行为
+                string commandToRun = baseCommand + "\n\n\n";
+
+                acEd.WriteMessage($"\n正在执行INSERT命令: {baseCommand}");
+
+                // 使用AutoCAD的SendStringToExecute方法
+                // 参数说明：
+                // 1. commandToRun: 格式化后的命令字符串（包含换行符）
+                // 2. true: 激活AutoCAD文档窗口
+                // 3. false: 不处理非活动文档
+                // 4. false: 不在命令行回显（可能有助于自动执行）
+                acDoc.SendStringToExecute(
+                    commandToRun,           // 要执行的命令
+                    true,                   // 执行后激活 AutoCAD 窗口
+                    false,                  // 不处理非活动文档
+                    true                   // 不在命令行显示（改为false可能有助于自动执行）
+                );
+
+                acEd.WriteMessage($"\nINSERT命令已发送，应该会自动执行");
+                acEd.WriteMessage($"\n如果命令未自动执行，请检查AutoCAD窗口或手动按回车键");
+            }
+            catch (Exception ex)
+            {
+                acEd.WriteMessage($"\n执行命令时发生错误: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 获取UI进程的路径
         /// </summary>
@@ -109,171 +166,6 @@ namespace BlockManager.Adapter._2010
             catch (Exception ex)
             {
                 return string.Empty;
-            }
-        }
-
-        [CommandMethod("BMTEST")]
-        public void TestLogging()
-        {
-            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            try
-            {
-                ed?.WriteMessage("\n=== BlockManager 2010 调试信息 ===");
-                
-                // 测试IPC服务器状态
-                ed?.WriteMessage($"\nIPC服务器运行状态: {(_ipcServer?.IsRunning ?? false)}");
-                
-                // 测试文件路径
-                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                ed?.WriteMessage($"\n桌面路径: {desktop}");
-                
-                var blockPath = CombinePaths(desktop, "BlockManager", "Block");
-                ed?.WriteMessage($"\n块文件夹路径: {blockPath}");
-                ed?.WriteMessage($"\n块文件夹存在: {Directory.Exists(blockPath)}");
-                
-                // 测试UI路径
-                var uiPath = GetUIProcessPath();
-                ed?.WriteMessage($"\nUI程序路径: {uiPath}");
-                ed?.WriteMessage($"\nUI程序存在: {File.Exists(uiPath)}");
-                
-                // 测试服务实例
-                ed?.WriteMessage($"\n块库服务实例: {(_blockLibraryService != null ? "已创建" : "未创建")}");
-                ed?.WriteMessage($"\nCAD命令服务实例: {(_cadCommandService != null ? "已创建" : "未创建")}");
-                
-                // 测试日志文件
-                var logPath = @"c:\temp\blockmgr_test.log";
-                try
-                {
-                    if (!Directory.Exists(@"c:\temp"))
-                    {
-                        Directory.CreateDirectory(@"c:\temp");
-                    }
-
-                    var testContent = $"测试时间: {DateTime.Now}\n" +
-                                    $"IPC服务器状态: {(_ipcServer?.IsRunning ?? false)}\n" +
-                                    $"UI路径: {uiPath}\n" +
-                                    $"块路径: {blockPath}\n";
-                    
-                    File.WriteAllText(logPath, testContent);
-                    ed?.WriteMessage($"\n测试日志已写入: {logPath}");
-                }
-                catch (Exception ex)
-                {
-                    ed?.WriteMessage($"\n写入日志失败: {ex.Message}");
-                }
-                
-                // 测试插入功能
-                ed?.WriteMessage("\n=== 测试插入功能 ===");
-                var testFile = CombinePaths(blockPath, "围护结构", "1000x1000冠梁配筋断面.dwg");
-                ed?.WriteMessage($"\n测试文件: {testFile}");
-                ed?.WriteMessage($"\n测试文件存在: {File.Exists(testFile)}");
-                
-                if (File.Exists(testFile))
-                {
-                    ed?.WriteMessage("\n开始测试插入...");
-                    _blockLibraryService?.InsertDwgBlock(testFile, "测试块");
-                }
-                
-                ed?.WriteMessage("\n=== 调试信息结束 ===");
-            }
-            catch (Exception ex)
-            {
-                ed?.WriteMessage($"\n调试测试出错: {ex.Message}");
-                ed?.WriteMessage($"\n错误详情: {ex.ToString()}");
-            }
-        }
-
-        [CommandMethod("BMSTART")]
-        public void StartIPCServer()
-        {
-            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            try
-            {
-                ed?.WriteMessage("\n=== 启动IPC服务器 ===");
-                ed?.WriteMessage($"\n当前IPC服务器状态: {(_ipcServer?.IsRunning ?? false)}");
-                
-                if (_ipcServer == null)
-                {
-                    ed?.WriteMessage("\n错误：IPC服务器实例为null，重新创建...");
-                    _ipcServer = new SimpleIPCServer(_blockLibraryService, "BlockManager_IPC");
-                }
-                
-                if (!_ipcServer.IsRunning)
-                {
-                    ed?.WriteMessage("\n正在启动IPC服务器...");
-                    _ipcServer.Start();
-                    
-                    // 等待一下让服务器启动
-                    System.Threading.Thread.Sleep(1000);
-                    
-                    ed?.WriteMessage($"\nIPC服务器启动后状态: {_ipcServer.IsRunning}");
-                }
-                else
-                {
-                    ed?.WriteMessage("\nIPC服务器已在运行");
-                }
-                
-                ed?.WriteMessage("\n=== IPC服务器启动完成 ===");
-            }
-            catch (Exception ex)
-            {
-                ed?.WriteMessage($"\n启动IPC服务器出错: {ex.Message}");
-                ed?.WriteMessage($"\n错误详情: {ex.ToString()}");
-            }
-        }
-
-        [CommandMethod("BMINSERT")]
-        public void TestInsert()
-        {
-            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            try
-            {
-                ed?.WriteMessage("\n=== 测试INSERT命令 ===");
-                
-                // 测试文件路径
-                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                var testFile = CombinePaths(desktop, "BlockManager", "Block", "围护结构", "1000x1000冠梁配筋断面.dwg");
-                
-                ed?.WriteMessage($"\n测试文件: {testFile}");
-                ed?.WriteMessage($"\n文件存在: {File.Exists(testFile)}");
-                
-                if (!File.Exists(testFile))
-                {
-                    ed?.WriteMessage("\n错误：测试文件不存在！");
-                    return;
-                }
-                
-                var doc = Application.DocumentManager.MdiActiveDocument;
-                if (doc == null)
-                {
-                    ed?.WriteMessage("\n错误：没有活动文档！");
-                    return;
-                }
-                
-                // 测试不同的INSERT命令格式
-                string normalizedPath = Path.GetFullPath(testFile);
-                string escapedPath = normalizedPath.Replace("\\", "/");
-                
-                ed?.WriteMessage($"\n标准化路径: {normalizedPath}");
-                ed?.WriteMessage($"\n转义路径: {escapedPath}");
-                
-                // 方法1：简单INSERT
-                ed?.WriteMessage("\n--- 方法1：简单INSERT ---");
-                string cmd1 = "INSERT ";
-                ed?.WriteMessage($"\n发送命令: {cmd1}");
-                doc.SendStringToExecute(cmd1, true, false, false);
-                
-                System.Threading.Thread.Sleep(500);
-                
-                ed?.WriteMessage($"\n发送路径: \"{escapedPath}\"");
-                doc.SendStringToExecute($"\"{escapedPath}\" ", true, false, false);
-                
-                ed?.WriteMessage("\n=== INSERT测试完成 ===");
-            }
-            catch (Exception ex)
-            {
-                ed?.WriteMessage($"\nINSERT测试出错: {ex.Message}");
-                ed?.WriteMessage($"\n错误详情: {ex.ToString()}");
             }
         }
 

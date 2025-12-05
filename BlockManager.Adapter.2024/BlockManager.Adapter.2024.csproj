@@ -56,6 +56,7 @@
     <Compile Include="Cad2024BlockLibraryService.cs" />
     <Compile Include="Cad2024CADCommandService.cs" />
     <Compile Include="Cad2024IPCServerImplementation.cs" />
+    <Compile Include="SimpleBlockJig.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -14,12 +14,6 @@ namespace BlockManager.Abstractions
         void ExecuteCommand(string command);
 
         /// <summary>
-        /// 向CAD命令行输出消息
-        /// </summary>
-        /// <param name="message">消息内容</param>
-        void WriteMessage(string message);
-
-        /// <summary>
         /// 获取当前工作目录
         /// </summary>
         /// <returns>当前工作目录路径</returns>

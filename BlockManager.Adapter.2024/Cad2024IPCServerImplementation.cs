@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using BlockManager.Abstractions;
 using BlockManager.IPC.Contracts;
@@ -13,14 +14,16 @@ namespace BlockManager.Adapter._2024
     public class Cad2024IPCServerImplementation : IBlockManagerServer
     {
         private readonly IBlockLibraryService _blockLibraryService;
+        private readonly ICADCommandService _cadCommandService;
         private readonly BlockManagerServerImplementation _baseImplementation;
 
-        public Cad2024IPCServerImplementation(IBlockLibraryService blockLibraryService)
+        public Cad2024IPCServerImplementation(IBlockLibraryService blockLibraryService, ICADCommandService cadCommandService)
         {
             _blockLibraryService = blockLibraryService ?? throw new ArgumentNullException(nameof(blockLibraryService));
+            _cadCommandService = cadCommandService ?? throw new ArgumentNullException(nameof(cadCommandService));
             
-            // 创建基础实现，并传入插入块的处理函数
-            _baseImplementation = new BlockManagerServerImplementation(HandleInsertBlockAsync);
+            // 创建基础实现
+            _baseImplementation = new BlockManagerServerImplementation();
         }
 
         public bool IsRunning => _baseImplementation.IsRunning;
@@ -66,32 +69,47 @@ namespace BlockManager.Adapter._2024
             return await _baseImplementation.GetFilePreviewAsync(filePath);
         }
 
-        public async Task<bool> InsertBlockAsync(InsertBlockRequest request)
+        public async Task<CommandExecutionResponse> ExecuteCommandAsync(CommandExecutionRequest request)
         {
-            return await _baseImplementation.InsertBlockAsync(request);
-        }
-
-        /// <summary>
-        /// 处理插入块的请求
-        /// </summary>
-        /// <param name="blockPath">块文件路径</param>
-        /// <param name="blockName">块名称</param>
-        /// <returns>操作是否成功</returns>
-        private async Task<bool> HandleInsertBlockAsync(string blockPath, string blockName)
-        {
+            var stopwatch = Stopwatch.StartNew();
+            
             try
             {
-                // 使用现有的块库服务来插入块
-                _blockLibraryService.InsertDwgBlock(blockPath, blockName);
-                await Task.CompletedTask;
-                return true;
+                LogToAutoCAD($"[2024 IPC] 执行命令: {request.Command}");
+                
+                // 执行CAD命令
+                _cadCommandService.ExecuteCommand(request.Command);
+                
+                stopwatch.Stop();
+                
+                var response = new CommandExecutionResponse
+                {
+                    IsSuccess = true,
+                    Result = $"命令 '{request.Command}' 执行完成",
+                    ExecutedAt = DateTime.UtcNow,
+                    ExecutionTimeMs = stopwatch.ElapsedMilliseconds
+                };
+                
+                LogToAutoCAD($"[2024 IPC] 命令执行成功，耗时: {stopwatch.ElapsedMilliseconds}ms");
+                return response;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"插入块时出错: {ex.Message}");
-                return false;
+                stopwatch.Stop();
+                
+                LogToAutoCAD($"[2024 IPC] 命令执行失败: {ex.Message}");
+                
+                return new CommandExecutionResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = ex.Message,
+                    ExecutedAt = DateTime.UtcNow,
+                    ExecutionTimeMs = stopwatch.ElapsedMilliseconds
+                };
             }
         }
+        
+      
 
         /// <summary>
         /// 输出日志到AutoCAD命令行

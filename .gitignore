@@ -364,3 +364,4 @@ MigrationBackup/
 # 如果有临时测试文件可以在这里添加
 *.mdc
 Block/
+*.md

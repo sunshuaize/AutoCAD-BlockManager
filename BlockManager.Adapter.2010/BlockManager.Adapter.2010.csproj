@@ -47,7 +47,7 @@
     <Compile Include="BlockInsertCommands.cs" />
     <Compile Include="Cad2010BlockLibraryService.cs" />
     <Compile Include="Cad2010CADCommandService.cs" />
-    <Compile Include="SimpleIPCServer.cs" />
+    <Compile Include="Cad2010IPCServerImplementation.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -13,11 +13,8 @@ namespace BlockManager.IPC.Server
     /// </summary>
     public class BlockManagerServerImplementation : IBlockManagerServer
     {
-        private readonly Func<string, string, Task<bool>>? _insertBlockHandler;
-
-        public BlockManagerServerImplementation(Func<string, string, Task<bool>>? insertBlockHandler = null)
+        public BlockManagerServerImplementation()
         {
-            _insertBlockHandler = insertBlockHandler;
         }
 
         public bool IsRunning { get; private set; }
@@ -120,26 +117,21 @@ namespace BlockManager.IPC.Server
             }
         }
 
-        public async Task<bool> InsertBlockAsync(InsertBlockRequest request)
+        public async Task<CommandExecutionResponse> ExecuteCommandAsync(CommandExecutionRequest request)
         {
-            try
+            await Task.CompletedTask;
+            
+            // 基础实现返回未实现错误
+            return new CommandExecutionResponse
             {
-                if (_insertBlockHandler != null)
-                {
-                    return await _insertBlockHandler(request.BlockPath, request.BlockName);
-                }
-
-                // 默认实现：只是记录日志
-                Console.WriteLine($"请求插入块: {request.BlockName} 从路径: {request.BlockPath}");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"插入块时出错: {ex.Message}");
-                return false;
-            }
+                IsSuccess = false,
+                ErrorMessage = "命令执行功能需要在具体的适配器实现中提供",
+                ExecutedAt = DateTime.UtcNow,
+                ExecutionTimeMs = 0
+            };
         }
 
+     
         private TreeNodeDto BuildTreeNode(string path, string name)
         {
             var node = new TreeNodeDto

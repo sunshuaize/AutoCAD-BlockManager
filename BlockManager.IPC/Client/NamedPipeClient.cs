@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -127,18 +128,35 @@ namespace BlockManager.IPC.Client
             return JsonConvert.DeserializeObject<PreviewDto>(JsonConvert.SerializeObject(response.Data))!;
         }
 
-        public async Task<bool> InsertBlockAsync(InsertBlockRequest request)
+        public async Task<CommandExecutionResponse> ExecuteCommandAsync(string command, Dictionary<string, object>? parameters = null)
         {
-            var requestMessage = new RequestMessage
+            var request = new RequestMessage
             {
-                Action = "INSERT_BLOCK",
-                Data = request
+                Action = "EXECUTE_COMMAND",
+                Data = new CommandExecutionRequest
+                {
+                    Command = command,
+                    Parameters = parameters,
+                    WaitForCompletion = true,
+                    TimeoutMs = 30000
+                }
             };
 
-            var response = await SendRequestAsync(requestMessage);
-            return response.IsSuccess;
-        }
+            var response = await SendRequestAsync(request);
+            
+            if (!response.IsSuccess)
+            {
+                return new CommandExecutionResponse
+                {
+                    IsSuccess = false,
+                    ErrorMessage = response.Error?.Message ?? "未知错误"
+                };
+            }
 
+            return JsonConvert.DeserializeObject<CommandExecutionResponse>(JsonConvert.SerializeObject(response.Data))!;
+        }
+        
+    
         private async Task<ResponseMessage> SendRequestAsync(RequestMessage request)
         {
             if (!IsConnected)
